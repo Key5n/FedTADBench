@@ -6,6 +6,7 @@ from torch.utils.data import DataLoader
 from options import features_dict, args
 from algorithms.DeepSVDD.DeepSVDD import BaseNet
 
+
 class Model_first_stage(BaseNet):
     def __init__(self):
         super(Model_first_stage, self).__init__()
@@ -24,7 +25,7 @@ class Model_first_stage(BaseNet):
 
         self.mse_loss = nn.MSELoss()
 
-        self.device = torch.device('cuda:0')
+        self.device = torch.device("cuda:0")
 
     def forward(self, x):
         x_hat = self.linear1(x)
@@ -44,9 +45,10 @@ class Model_first_stage(BaseNet):
         if len(x_hat.size()) == 3:
             x_hat = x_hat[:, -1, :]
         scores = torch.tensor(scores)
-        others = {'output': x_hat}
+        others = {"output": x_hat}
 
         return h, scores, others
+
 
 class Model_second_stage(nn.Module):
     def __init__(self):
@@ -66,7 +68,7 @@ class Model_second_stage(nn.Module):
         self.R = torch.tensor(0.0)  # radius R initialized with 0 by default.
         self.nu = 0.1
 
-        self.device = torch.device('cuda:0')
+        self.device = torch.device("cuda:0")
 
         self.c = None
 

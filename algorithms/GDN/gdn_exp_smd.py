@@ -25,8 +25,13 @@ from sklearn.preprocessing import MinMaxScaler
 
 from algorithms.read_datasets import SMD_Dataset, SMAP_Dataset, PSM_Dataset
 from algorithms.GDN.train_federated_learning import train, timeSincePlus
-from algorithms.GDN.evaluate import get_err_scores, get_best_performance_data, get_val_performance_data, \
-    get_full_err_scores, get_full_err_scores_only_test
+from algorithms.GDN.evaluate import (
+    get_err_scores,
+    get_best_performance_data,
+    get_val_performance_data,
+    get_full_err_scores,
+    get_full_err_scores_only_test,
+)
 
 import sys
 from datetime import datetime
@@ -51,7 +56,7 @@ from scores_adjusted import roc_curve_adjusted_for_time_series
 
 def test(model, dataloader):
     # test
-    loss_func = nn.MSELoss(reduction='mean')
+    loss_func = nn.MSELoss(reduction="mean")
     device = get_device()
 
     test_loss_list = []
@@ -72,7 +77,9 @@ def test(model, dataloader):
     i = 0
     acu_loss = 0
     for x, y, labels, edge_index in dataloader:
-        x, y, labels, edge_index = [item.to(device).float() for item in [x, y, labels, edge_index]]
+        x, y, labels, edge_index = [
+            item.to(device).float() for item in [x, y, labels, edge_index]
+        ]
 
         with torch.no_grad():
 
@@ -89,7 +96,9 @@ def test(model, dataloader):
                 t_test_ground_list = y
                 t_test_labels_list = labels
             else:
-                t_test_predicted_list = torch.cat((t_test_predicted_list, predicted), dim=0)
+                t_test_predicted_list = torch.cat(
+                    (t_test_predicted_list, predicted), dim=0
+                )
                 t_test_ground_list = torch.cat((t_test_ground_list, y), dim=0)
                 t_test_labels_list = torch.cat((t_test_labels_list, labels), dim=0)
 
@@ -109,22 +118,23 @@ def test(model, dataloader):
 
     return avg_loss, [test_predicted_list, test_ground_list, test_labels_list]
 
-_device = torch.device('cuda:0')
+
+_device = torch.device("cuda:0")
+
 
 def get_device():
     # return torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     return _device
 
+
 def set_device(dev):
     global _device
     _device = dev
 
+
 def build_loc_net(struc, all_features, feature_map=[]):
     index_feature_map = feature_map
-    edge_indexes = [
-        [],
-        []
-    ]
+    edge_indexes = [[], []]
     for node_name, node_list in struc.items():
         if node_name not in all_features:
             continue
@@ -138,7 +148,7 @@ def build_loc_net(struc, all_features, feature_map=[]):
                 continue
 
             if child not in index_feature_map:
-                print(f'error: {child} not in index_feature_map')
+                print(f"error: {child} not in index_feature_map")
                 # index_feature_map.append(child)
 
             c_index = index_feature_map.index(child)
@@ -149,6 +159,7 @@ def build_loc_net(struc, all_features, feature_map=[]):
 
     return edge_indexes
 
+
 def construct_data(data, feature_map, labels=0):
     res = []
 
@@ -156,36 +167,52 @@ def construct_data(data, feature_map, labels=0):
         if feature in data.columns:
             res.append(data.loc[:, feature].values.tolist())
         else:
-            print(feature, 'not exist in data')
+            print(feature, "not exist in data")
     # append labels as last
     sample_n = len(res[0])
 
     if type(labels) == int:
-        res.append([labels]*sample_n)
+        res.append([labels] * sample_n)
     elif len(labels) == sample_n:
         res.append(labels)
 
     return res
 
+
 def get_feature_map(dataset):
-    if 'FedTADBench' in os.path.abspath(os.path.dirname(os.path.dirname(os.getcwd()))):
-        if dataset == 'smd':
-            feature_file = open(os.path.abspath(os.path.dirname(os.path.dirname(os.getcwd()))) + '/data/datasets/smd/SMD/raw/list.txt', 'r')
-        elif dataset == 'smap':
-            feature_file = open(os.path.abspath(os.path.dirname(os.path.dirname(os.getcwd()))) + '/data/datasets/smap/raw/list.txt', 'r')
-        elif dataset == 'psm':
-            feature_file = open(os.path.abspath(os.path.dirname(os.path.dirname(os.getcwd()))) + '/data/datasets/psm/raw/list.txt', 'r')
+    if "FedTADBench" in os.path.abspath(os.path.dirname(os.path.dirname(os.getcwd()))):
+        if dataset == "smd":
+            feature_file = open(
+                os.path.abspath(os.path.dirname(os.path.dirname(os.getcwd())))
+                + "/data/datasets/smd/SMD/raw/list.txt",
+                "r",
+            )
+        elif dataset == "smap":
+            feature_file = open(
+                os.path.abspath(os.path.dirname(os.path.dirname(os.getcwd())))
+                + "/data/datasets/smap/raw/list.txt",
+                "r",
+            )
+        elif dataset == "psm":
+            feature_file = open(
+                os.path.abspath(os.path.dirname(os.path.dirname(os.getcwd())))
+                + "/data/datasets/psm/raw/list.txt",
+                "r",
+            )
     else:
-        if dataset == 'smd':
+        if dataset == "smd":
             feature_file = open(
-                os.path.abspath(os.getcwd()) + '/data/datasets/smd/SMD/raw/list.txt',
-                'r')
-        elif dataset == 'smap':
+                os.path.abspath(os.getcwd()) + "/data/datasets/smd/SMD/raw/list.txt",
+                "r",
+            )
+        elif dataset == "smap":
             feature_file = open(
-                os.path.abspath(os.getcwd()) + '/data/datasets/smap/raw/list.txt', 'r')
-        elif dataset == 'psm':
+                os.path.abspath(os.getcwd()) + "/data/datasets/smap/raw/list.txt", "r"
+            )
+        elif dataset == "psm":
             feature_file = open(
-                os.path.abspath(os.getcwd()) + '/data/datasets/psm/raw/list.txt', 'r')
+                os.path.abspath(os.getcwd()) + "/data/datasets/psm/raw/list.txt", "r"
+            )
 
     feature_list = []
     for ft in feature_file:
@@ -193,25 +220,41 @@ def get_feature_map(dataset):
 
     return feature_list
 
+
 def get_fc_graph_struc(dataset):
-    if 'FedTADBench' in os.path.abspath(os.path.dirname(os.path.dirname(os.getcwd()))):
-        if dataset == 'smd':
-            feature_file = open(os.path.abspath(os.path.dirname(os.path.dirname(os.getcwd()))) + '/data/datasets/smd/SMD/raw/list.txt', 'r')
-        elif dataset == 'smap':
-            feature_file = open(os.path.abspath(os.path.dirname(os.path.dirname(os.getcwd()))) + '/data/datasets/smap/raw/list.txt', 'r')
-        elif dataset == 'psm':
-            feature_file = open(os.path.abspath(os.path.dirname(os.path.dirname(os.getcwd()))) + '/data/datasets/psm/raw/list.txt', 'r')
+    if "FedTADBench" in os.path.abspath(os.path.dirname(os.path.dirname(os.getcwd()))):
+        if dataset == "smd":
+            feature_file = open(
+                os.path.abspath(os.path.dirname(os.path.dirname(os.getcwd())))
+                + "/data/datasets/smd/SMD/raw/list.txt",
+                "r",
+            )
+        elif dataset == "smap":
+            feature_file = open(
+                os.path.abspath(os.path.dirname(os.path.dirname(os.getcwd())))
+                + "/data/datasets/smap/raw/list.txt",
+                "r",
+            )
+        elif dataset == "psm":
+            feature_file = open(
+                os.path.abspath(os.path.dirname(os.path.dirname(os.getcwd())))
+                + "/data/datasets/psm/raw/list.txt",
+                "r",
+            )
     else:
-        if dataset == 'smd':
+        if dataset == "smd":
             feature_file = open(
-                os.path.abspath(os.getcwd()) + '/data/datasets/smd/SMD/raw/list.txt',
-                'r')
-        elif dataset == 'smap':
+                os.path.abspath(os.getcwd()) + "/data/datasets/smd/SMD/raw/list.txt",
+                "r",
+            )
+        elif dataset == "smap":
             feature_file = open(
-                os.path.abspath(os.getcwd()) + '/data/datasets/smap/raw/list.txt', 'r')
-        elif dataset == 'psm':
+                os.path.abspath(os.getcwd()) + "/data/datasets/smap/raw/list.txt", "r"
+            )
+        elif dataset == "psm":
             feature_file = open(
-                os.path.abspath(os.getcwd()) + '/data/datasets/psm/raw/list.txt', 'r')
+                os.path.abspath(os.getcwd()) + "/data/datasets/psm/raw/list.txt", "r"
+            )
 
     struc_map = {}
     feature_list = []
@@ -228,8 +271,9 @@ def get_fc_graph_struc(dataset):
 
     return struc_map
 
+
 class TimeDataset(Dataset):
-    def __init__(self, raw_data, edge_index, mode='train', config=None):
+    def __init__(self, raw_data, edge_index, mode="train", config=None):
         self.raw_data = raw_data
 
         self.config = config
@@ -254,17 +298,21 @@ class TimeDataset(Dataset):
         x_arr, y_arr = [], []
         labels_arr = []
 
-        slide_win, slide_stride = [self.config[k] for k
-                                   in ['slide_win', 'slide_stride']
-                                   ]
-        is_train = self.mode == 'train'
+        slide_win, slide_stride = [
+            self.config[k] for k in ["slide_win", "slide_stride"]
+        ]
+        is_train = self.mode == "train"
 
         node_num, total_time_len = data.shape
 
-        rang = range(slide_win, total_time_len, slide_stride) if is_train else range(slide_win, total_time_len)
+        rang = (
+            range(slide_win, total_time_len, slide_stride)
+            if is_train
+            else range(slide_win, total_time_len)
+        )
 
         for i in rang:
-            ft = data[:, i - slide_win:i]
+            ft = data[:, i - slide_win : i]
             tar = data[:, i]
 
             x_arr.append(ft)
@@ -289,8 +337,9 @@ class TimeDataset(Dataset):
 
         return feature, y, label, edge_index
 
+
 def loss_func(y_pred, y_true):
-    loss = F.mse_loss(y_pred, y_true, reduction='mean')
+    loss = F.mse_loss(y_pred, y_true, reduction="mean")
 
     return loss
 
@@ -302,7 +351,7 @@ def get_batch_edge_index(org_edge_index, batch_num, node_num):
     batch_edge_index = edge_index.repeat(1, batch_num).contiguous()
 
     for i in range(batch_num):
-        batch_edge_index[:, i * edge_num:(i + 1) * edge_num] += i * node_num
+        batch_edge_index[:, i * edge_num : (i + 1) * edge_num] += i * node_num
 
     return batch_edge_index.long()
 
@@ -343,14 +392,18 @@ class GNNLayer(nn.Module):
     def __init__(self, in_channel, out_channel, inter_dim=0, heads=1, node_num=100):
         super(GNNLayer, self).__init__()
 
-        self.gnn = GraphLayer(in_channel, out_channel, inter_dim=inter_dim, heads=heads, concat=False)
+        self.gnn = GraphLayer(
+            in_channel, out_channel, inter_dim=inter_dim, heads=heads, concat=False
+        )
 
         self.bn = nn.BatchNorm1d(out_channel)
         self.relu = nn.ReLU()
         self.leaky_relu = nn.LeakyReLU()
 
     def forward(self, x, edge_index, embedding=None, node_num=0):
-        out, (new_edge_index, att_weight) = self.gnn(x, edge_index, embedding, return_attention_weights=True)
+        out, (new_edge_index, att_weight) = self.gnn(
+            x, edge_index, embedding, return_attention_weights=True
+        )
         self.att_weight_1 = att_weight
         self.edge_index_1 = new_edge_index
 
@@ -360,9 +413,19 @@ class GNNLayer(nn.Module):
 
 
 class GraphLayer(MessagePassing):
-    def __init__(self, in_channels, out_channels, heads=1, concat=True,
-                 negative_slope=0.2, dropout=0, bias=True, inter_dim=-1, **kwargs):
-        super(GraphLayer, self).__init__(aggr='add', **kwargs)
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        heads=1,
+        concat=True,
+        negative_slope=0.2,
+        dropout=0,
+        bias=True,
+        inter_dim=-1,
+        **kwargs,
+    ):
+        super(GraphLayer, self).__init__(aggr="add", **kwargs)
 
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -385,7 +448,7 @@ class GraphLayer(MessagePassing):
         elif bias and not concat:
             self.bias = Parameter(torch.Tensor(out_channels))
         else:
-            self.register_parameter('bias', None)
+            self.register_parameter("bias", None)
 
         self.reset_parameters()
 
@@ -408,11 +471,15 @@ class GraphLayer(MessagePassing):
             x = (self.lin(x[0]), self.lin(x[1]))
 
         edge_index, _ = remove_self_loops(edge_index)
-        edge_index, _ = add_self_loops(edge_index,
-                                       num_nodes=x[1].size(self.node_dim))
+        edge_index, _ = add_self_loops(edge_index, num_nodes=x[1].size(self.node_dim))
 
-        out = self.propagate(edge_index, x=x, embedding=embedding, edges=edge_index,
-                             return_attention_weights=return_attention_weights)
+        out = self.propagate(
+            edge_index,
+            x=x,
+            embedding=embedding,
+            edges=edge_index,
+            return_attention_weights=return_attention_weights,
+        )
 
         if self.concat:
             out = out.view(-1, self.heads * self.out_channels)
@@ -428,10 +495,9 @@ class GraphLayer(MessagePassing):
         else:
             return out
 
-    def message(self, x_i, x_j, edge_index_i, size_i,
-                embedding,
-                edges,
-                return_attention_weights):
+    def message(
+        self, x_i, x_j, edge_index_i, size_i, embedding, edges, return_attention_weights
+    ):
 
         x_i = x_i.view(-1, self.heads, self.out_channels)
         x_j = x_j.view(-1, self.heads, self.out_channels)
@@ -462,14 +528,22 @@ class GraphLayer(MessagePassing):
         return x_j * alpha.view(-1, self.heads, 1)
 
     def __repr__(self):
-        return '{}({}, {}, heads={})'.format(self.__class__.__name__,
-                                             self.in_channels,
-                                             self.out_channels, self.heads)
+        return "{}({}, {}, heads={})".format(
+            self.__class__.__name__, self.in_channels, self.out_channels, self.heads
+        )
 
 
 class GDN(nn.Module):
-    def __init__(self, edge_index_sets, node_num, dim=64, out_layer_inter_dim=256, input_dim=10, out_layer_num=1,
-                 topk=20):
+    def __init__(
+        self,
+        edge_index_sets,
+        node_num,
+        dim=64,
+        out_layer_inter_dim=256,
+        input_dim=10,
+        out_layer_num=1,
+        topk=20,
+    ):
 
         super(GDN, self).__init__()
 
@@ -484,15 +558,20 @@ class GDN(nn.Module):
         self.bn_outlayer_in = nn.BatchNorm1d(embed_dim)
 
         edge_set_num = len(edge_index_sets)
-        self.gnn_layers = nn.ModuleList([
-            GNNLayer(input_dim, dim, inter_dim=dim + embed_dim, heads=1) for i in range(edge_set_num)
-        ])
+        self.gnn_layers = nn.ModuleList(
+            [
+                GNNLayer(input_dim, dim, inter_dim=dim + embed_dim, heads=1)
+                for i in range(edge_set_num)
+            ]
+        )
 
         self.node_embedding = None
         self.topk = topk
         self.learned_graph = None
 
-        self.out_layer = OutLayer(dim * edge_set_num, node_num, out_layer_num, inter_num=out_layer_inter_dim)
+        self.out_layer = OutLayer(
+            dim * edge_set_num, node_num, out_layer_num, inter_num=out_layer_inter_dim
+        )
 
         self.cache_edge_index_sets = [None] * edge_set_num
         self.cache_embed_index = None
@@ -519,8 +598,13 @@ class GDN(nn.Module):
             edge_num = edge_index.shape[1]
             cache_edge_index = self.cache_edge_index_sets[i]
 
-            if cache_edge_index is None or cache_edge_index.shape[1] != edge_num * batch_num:
-                self.cache_edge_index_sets[i] = get_batch_edge_index(edge_index, batch_num, node_num).to(device)
+            if (
+                cache_edge_index is None
+                or cache_edge_index.shape[1] != edge_num * batch_num
+            ):
+                self.cache_edge_index_sets[i] = get_batch_edge_index(
+                    edge_index, batch_num, node_num
+                ).to(device)
 
             batch_edge_index = self.cache_edge_index_sets[i]
 
@@ -532,7 +616,9 @@ class GDN(nn.Module):
             weights = weights_arr.view(node_num, -1)
 
             cos_ji_mat = torch.matmul(weights, weights.T)
-            normed_mat = torch.matmul(weights.norm(dim=-1).view(-1, 1), weights.norm(dim=-1).view(1, -1))
+            normed_mat = torch.matmul(
+                weights.norm(dim=-1).view(-1, 1), weights.norm(dim=-1).view(1, -1)
+            )
             cos_ji_mat = cos_ji_mat / normed_mat
 
             dim = weights.shape[-1]
@@ -542,13 +628,26 @@ class GDN(nn.Module):
 
             self.learned_graph = topk_indices_ji
 
-            gated_i = torch.arange(0, node_num).T.unsqueeze(1).repeat(1, topk_num).flatten().to(device).unsqueeze(0)
+            gated_i = (
+                torch.arange(0, node_num)
+                .T.unsqueeze(1)
+                .repeat(1, topk_num)
+                .flatten()
+                .to(device)
+                .unsqueeze(0)
+            )
             gated_j = topk_indices_ji.flatten().unsqueeze(0)
             gated_edge_index = torch.cat((gated_j, gated_i), dim=0)
 
-            batch_gated_edge_index = get_batch_edge_index(gated_edge_index, batch_num, node_num).to(device)
-            gcn_out = self.gnn_layers[i](x, batch_gated_edge_index, node_num=node_num * batch_num,
-                                         embedding=all_embeddings)
+            batch_gated_edge_index = get_batch_edge_index(
+                gated_edge_index, batch_num, node_num
+            ).to(device)
+            gcn_out = self.gnn_layers[i](
+                x,
+                batch_gated_edge_index,
+                node_num=node_num * batch_num,
+                embedding=all_embeddings,
+            )
 
             gcn_outs.append(gcn_out)
 
@@ -570,15 +669,36 @@ class GDN(nn.Module):
 
         loss = loss_func(out, labels)
 
-        return out_features, out, loss  # out_features: (批量大小, 维度数量, dims), out: 预测结果 (批量大小, 维度数量)
+        return (
+            out_features,
+            out,
+            loss,
+        )  # out_features: (批量大小, 维度数量, dims), out: 预测结果 (批量大小, 维度数量)
 
 
-class Main():
+class Main:
 
-    def __init__(self, batch: int=128, epoch: int=100, slide_win: int=15, dim: int=64, slide_stride: int=5,
-                 save_path_pattern: str='', dataset: str='smd', device: str='cuda', random_seed: int=0,
-                 comment: str='', out_layer_num: int=1, out_layer_inter_dim: int=256, decay: float=0,
-                 val_ratio: float=0, topk: int=20, report: str='best', load_model_path: str='', debug=False):
+    def __init__(
+        self,
+        batch: int = 128,
+        epoch: int = 100,
+        slide_win: int = 15,
+        dim: int = 64,
+        slide_stride: int = 5,
+        save_path_pattern: str = "",
+        dataset: str = "smd",
+        device: str = "cuda",
+        random_seed: int = 0,
+        comment: str = "",
+        out_layer_num: int = 1,
+        out_layer_inter_dim: int = 256,
+        decay: float = 0,
+        val_ratio: float = 0,
+        topk: int = 20,
+        report: str = "best",
+        load_model_path: str = "",
+        debug=False,
+    ):
 
         random.seed(random_seed)
         np.random.seed(random_seed)
@@ -587,45 +707,45 @@ class Main():
         torch.cuda.manual_seed_all(random_seed)
         torch.backends.cudnn.benchmark = False
         torch.backends.cudnn.deterministic = True
-        os.environ['PYTHONHASHSEED'] = str(random_seed)
+        os.environ["PYTHONHASHSEED"] = str(random_seed)
         self.dataset = dataset
 
         train_config = {
-            'batch': batch,
-            'epoch': epoch,
-            'slide_win': slide_win,
-            'dim': dim,
-            'slide_stride': slide_stride,
-            'comment': comment,
-            'seed': random_seed,
-            'out_layer_num': out_layer_num,
-            'out_layer_inter_dim': out_layer_inter_dim,
-            'decay': decay,
-            'val_ratio': val_ratio,
-            'topk': topk,
+            "batch": batch,
+            "epoch": epoch,
+            "slide_win": slide_win,
+            "dim": dim,
+            "slide_stride": slide_stride,
+            "comment": comment,
+            "seed": random_seed,
+            "out_layer_num": out_layer_num,
+            "out_layer_inter_dim": out_layer_inter_dim,
+            "decay": decay,
+            "val_ratio": val_ratio,
+            "topk": topk,
         }
 
         env_config = {
-            'save_path': save_path_pattern,
-            'dataset': dataset,
-            'report': report,
-            'device': device,
-            'load_model_path': load_model_path
+            "save_path": save_path_pattern,
+            "dataset": dataset,
+            "report": report,
+            "device": device,
+            "load_model_path": load_model_path,
         }
 
         self.train_config = train_config
         self.env_config = env_config
         self.datestr = None
 
-        dataset = self.env_config['dataset']
-        if dataset == 'smd' or dataset == 'smap' or dataset == 'psm':
-            if dataset == 'smd':
+        dataset = self.env_config["dataset"]
+        if dataset == "smd" or dataset == "smap" or dataset == "psm":
+            if dataset == "smd":
                 train_data = SMD_Dataset(train=True)
                 test_data = SMD_Dataset(train=False)
-            elif dataset == 'smap':
+            elif dataset == "smap":
                 train_data = SMAP_Dataset(train=True)
                 test_data = SMAP_Dataset(train=False)
-            elif dataset == 'psm':
+            elif dataset == "psm":
                 train_data = PSM_Dataset(train=True)
                 test_data = PSM_Dataset(train=False)
             columns = [str(i) for i in range(train_data.data.shape[-1])]
@@ -634,16 +754,18 @@ class Main():
             test = pd.DataFrame(test, columns=columns)
             labels = test_data.target
 
-        if 'attack' in train.columns:
-            train = train.drop(columns=['attack'])
+        if "attack" in train.columns:
+            train = train.drop(columns=["attack"])
 
         feature_map = get_feature_map(dataset)
         fc_struc = get_fc_graph_struc(dataset)
 
-        set_device(env_config['device'])
+        set_device(env_config["device"])
         self.device = get_device()
 
-        fc_edge_index = build_loc_net(fc_struc, list(train.columns), feature_map=feature_map)
+        fc_edge_index = build_loc_net(
+            fc_struc, list(train.columns), feature_map=feature_map
+        )
         fc_edge_index = torch.tensor(fc_edge_index, dtype=torch.long)
 
         self.feature_map = feature_map
@@ -651,34 +773,45 @@ class Main():
         test_dataset_indata = construct_data(test, feature_map, labels=labels)
 
         cfg = {
-            'slide_win': train_config['slide_win'],
-            'slide_stride': train_config['slide_stride'],
+            "slide_win": train_config["slide_win"],
+            "slide_stride": train_config["slide_stride"],
         }
 
-        train_dataset = TimeDataset(train_dataset_indata, fc_edge_index, mode='train', config=cfg)
-        test_dataset = TimeDataset(test_dataset_indata, fc_edge_index, mode='test', config=cfg)
+        train_dataset = TimeDataset(
+            train_dataset_indata, fc_edge_index, mode="train", config=cfg
+        )
+        test_dataset = TimeDataset(
+            test_dataset_indata, fc_edge_index, mode="test", config=cfg
+        )
 
-        train_dataloader, val_dataloader = self.get_loaders(train_dataset, train_config['seed'], train_config['batch'],
-                                                            val_ratio=train_config['val_ratio'])
+        train_dataloader, val_dataloader = self.get_loaders(
+            train_dataset,
+            train_config["seed"],
+            train_config["batch"],
+            val_ratio=train_config["val_ratio"],
+        )
 
         self.train_dataset = train_dataset
         self.test_dataset = test_dataset
 
         self.train_dataloader = train_dataloader
         self.val_dataloader = val_dataloader
-        self.test_dataloader = DataLoader(test_dataset, batch_size=train_config['batch'],
-                                          shuffle=False, num_workers=0)
+        self.test_dataloader = DataLoader(
+            test_dataset, batch_size=train_config["batch"], shuffle=False, num_workers=0
+        )
 
         edge_index_sets = []
         edge_index_sets.append(fc_edge_index)
 
-        self.model = GDN(edge_index_sets, len(feature_map),
-                         dim=train_config['dim'],
-                         input_dim=train_config['slide_win'],
-                         out_layer_num=train_config['out_layer_num'],
-                         out_layer_inter_dim=train_config['out_layer_inter_dim'],
-                         topk=train_config['topk']
-                         ).to(self.device)
+        self.model = GDN(
+            edge_index_sets,
+            len(feature_map),
+            dim=train_config["dim"],
+            input_dim=train_config["slide_win"],
+            out_layer_num=train_config["out_layer_num"],
+            out_layer_inter_dim=train_config["out_layer_inter_dim"],
+            topk=train_config["topk"],
+        ).to(self.device)
 
         print(self.model)
 
@@ -689,21 +822,34 @@ class Main():
         # else:
         #     model_save_path = self.get_save_path()[0]
 
-        model_save_path = os.path.abspath(os.path.join(os.getcwd(), "../..")) + '/fltsad/pths/gdn_' + self.dataset + '.pth'
-        score_save_path = os.path.abspath(os.path.join(os.getcwd(), "../..")) + '/fltsad/scores/gdn_' + self.dataset + '.npy'
+        model_save_path = (
+            os.path.abspath(os.path.join(os.getcwd(), "../.."))
+            + "/fltsad/pths/gdn_"
+            + self.dataset
+            + ".pth"
+        )
+        score_save_path = (
+            os.path.abspath(os.path.join(os.getcwd(), "../.."))
+            + "/fltsad/scores/gdn_"
+            + self.dataset
+            + ".npy"
+        )
 
         time_start = time.time()
 
-        self.train_log, best_auc_roc, best_ap = train(self.model, model_save_path,
-                               config=self.train_config,
-                               train_dataloader=self.train_dataloader,
-                               val_dataloader=self.val_dataloader,
-                               feature_map=self.feature_map,
-                               test_dataloader=self.test_dataloader,
-                               test_dataset=self.test_dataset,
-                               train_dataset=self.train_dataset,
-                               dataset_name=self.env_config['dataset'],
-                               score_save_path=score_save_path)
+        self.train_log, best_auc_roc, best_ap = train(
+            self.model,
+            model_save_path,
+            config=self.train_config,
+            train_dataloader=self.train_dataloader,
+            val_dataloader=self.val_dataloader,
+            feature_map=self.feature_map,
+            test_dataloader=self.test_dataloader,
+            test_dataset=self.test_dataset,
+            train_dataset=self.train_dataset,
+            dataset_name=self.env_config["dataset"],
+            score_save_path=score_save_path,
+        )
 
         time_end = time.time()
 
@@ -721,9 +867,9 @@ class Main():
         #     scores = self.get_score(self.test_result, self.val_result)
         #     np.save(score_save_path, scores)
 
-        print('Best auc_roc:', best_auc_roc)
-        print('Best ap:', best_ap)
-        print('Total time:', convert_time(time_end - time_start))
+        print("Best auc_roc:", best_auc_roc)
+        print("Best ap:", best_ap)
+        print("Total time:", convert_time(time_end - time_start))
 
     def get_loaders(self, train_dataset, seed, batch, val_ratio=0.1):
         dataset_len = int(len(train_dataset))
@@ -732,17 +878,17 @@ class Main():
         val_start_index = random.randrange(train_use_len)
         indices = torch.arange(dataset_len)
 
-        train_sub_indices = torch.cat([indices[:val_start_index], indices[val_start_index + val_use_len:]])
+        train_sub_indices = torch.cat(
+            [indices[:val_start_index], indices[val_start_index + val_use_len :]]
+        )
         train_subset = Subset(train_dataset, train_sub_indices)
 
-        val_sub_indices = indices[val_start_index:val_start_index + val_use_len]
+        val_sub_indices = indices[val_start_index : val_start_index + val_use_len]
         val_subset = Subset(train_dataset, val_sub_indices)
 
-        train_dataloader = DataLoader(train_subset, batch_size=batch,
-                                      shuffle=True)
+        train_dataloader = DataLoader(train_subset, batch_size=batch, shuffle=True)
         if val_ratio != 0:
-            val_dataloader = DataLoader(val_subset, batch_size=batch,
-                                        shuffle=False)
+            val_dataloader = DataLoader(val_subset, batch_size=batch, shuffle=False)
         else:
             val_dataloader = None
 
@@ -759,14 +905,16 @@ class Main():
         test_scores, normal_scores = get_full_err_scores(test_result, val_result)
 
         top1_best_info = get_best_performance_data(test_scores, test_labels, topk=1)
-        top1_val_info = get_val_performance_data(test_scores, normal_scores, test_labels, topk=1)
+        top1_val_info = get_val_performance_data(
+            test_scores, normal_scores, test_labels, topk=1
+        )
 
-        print('=========================** Result **============================\n')
+        print("=========================** Result **============================\n")
 
         info = None
-        if self.env_config['report'] == 'best':
+        if self.env_config["report"] == "best":
             info = top1_best_info
-        elif self.env_config['report'] == 'val':
+        elif self.env_config["report"] == "val":
             info = top1_val_info
 
         # print(f'F1 score: {info[0]}')
@@ -777,20 +925,23 @@ class Main():
         recall = info[2]
         f1 = 2 * precision * recall / (precision + recall)
 
-        print(f'F1 score: {f1}')
-        print(f'precision: {precision}')
-        print(f'recall: {recall}\n')
+        print(f"F1 score: {f1}")
+        print(f"precision: {precision}")
+        print(f"recall: {recall}\n")
 
         topk = 1
         total_features = test_scores.shape[0]
-        topk_indices = np.argpartition(test_scores, range(total_features - topk - 1, total_features), axis=0)[
-                       -topk:]
-        total_topk_err_scores = np.sum(np.take_along_axis(test_scores, topk_indices, axis=0), axis=0)
+        topk_indices = np.argpartition(
+            test_scores, range(total_features - topk - 1, total_features), axis=0
+        )[-topk:]
+        total_topk_err_scores = np.sum(
+            np.take_along_axis(test_scores, topk_indices, axis=0), axis=0
+        )
 
         auc_roc = roc_auc_score(test_labels, total_topk_err_scores)
-        print('auc_roc:', auc_roc)
+        print("auc_roc:", auc_roc)
         ap = average_precision_score(test_labels, total_topk_err_scores)
-        print('ap:', ap)
+        print("ap:", ap)
 
         return total_topk_err_scores
 
@@ -805,10 +956,10 @@ class Main():
 
         top1_best_info = get_best_performance_data(test_scores, test_labels, topk=1)
 
-        print('=========================** Result **============================\n')
+        print("=========================** Result **============================\n")
 
         info = None
-        if self.env_config['report'] == 'best':
+        if self.env_config["report"] == "best":
             info = top1_best_info
 
         # print(f'F1 score: {info[0]}')
@@ -819,34 +970,37 @@ class Main():
         recall = info[2]
         f1 = 2 * precision * recall / (precision + recall)
 
-        print(f'F1 score: {f1}')
-        print(f'precision: {precision}')
-        print(f'recall: {recall}\n')
+        print(f"F1 score: {f1}")
+        print(f"precision: {precision}")
+        print(f"recall: {recall}\n")
 
         topk = 1
         total_features = test_scores.shape[0]
-        topk_indices = np.argpartition(test_scores, range(total_features - topk - 1, total_features), axis=0)[
-                       -topk:]
-        total_topk_err_scores = np.sum(np.take_along_axis(test_scores, topk_indices, axis=0), axis=0)
+        topk_indices = np.argpartition(
+            test_scores, range(total_features - topk - 1, total_features), axis=0
+        )[-topk:]
+        total_topk_err_scores = np.sum(
+            np.take_along_axis(test_scores, topk_indices, axis=0), axis=0
+        )
 
         auc_roc = roc_auc_score(test_labels, total_topk_err_scores)
-        print('auc_roc:', auc_roc)
+        print("auc_roc:", auc_roc)
         ap = average_precision_score(test_labels, total_topk_err_scores)
-        print('ap:', ap)
+        print("ap:", ap)
         return total_topk_err_scores
 
-    def get_save_path(self, feature_name=''):
+    def get_save_path(self, feature_name=""):
 
-        dir_path = self.env_config['save_path']
+        dir_path = self.env_config["save_path"]
 
         if self.datestr is None:
             now = datetime.now()
-            self.datestr = now.strftime('%m|%d-%H:%M:%S')
+            self.datestr = now.strftime("%m|%d-%H:%M:%S")
         datestr = self.datestr
 
         paths = [
-            f'./pretrained/{dir_path}/best_{datestr}.pt',
-            f'./results/{dir_path}/{datestr}.csv',
+            f"./pretrained/{dir_path}/best_{datestr}.pt",
+            f"./results/{dir_path}/{datestr}.csv",
         ]
 
         for path in paths:
@@ -858,13 +1012,23 @@ class Main():
 
 if __name__ == "__main__":
 
-    main = Main(dataset='smd', save_path_pattern='gdn_smd', slide_stride=1, slide_win=5, batch=64, epoch=100,
-                comment='smd', random_seed=42, decay=0, dim=128, out_layer_num=1, out_layer_inter_dim=128,
-                val_ratio=0, report='best', topk=30, debug=False)
+    main = Main(
+        dataset="smd",
+        save_path_pattern="gdn_smd",
+        slide_stride=1,
+        slide_win=5,
+        batch=64,
+        epoch=100,
+        comment="smd",
+        random_seed=42,
+        decay=0,
+        dim=128,
+        out_layer_num=1,
+        out_layer_inter_dim=128,
+        val_ratio=0,
+        report="best",
+        topk=30,
+        debug=False,
+    )
 
     main.run()
-
-
-
-
-

@@ -5,17 +5,20 @@ import torch.nn as nn
 def get_default_device():
     """Pick GPU if available, else CPU"""
     if torch.cuda.is_available():
-        return torch.device('cuda')
+        return torch.device("cuda")
     else:
-        return torch.device('cpu')
+        return torch.device("cpu")
+
 
 device = get_default_device()
+
 
 def to_device(data, device):
     """Move tensor(s) to chosen device"""
     if isinstance(data, (list, tuple)):
         return [to_device(x, device) for x in data]
     return data.to(device, non_blocking=True)
+
 
 class USAD_Encoder(nn.Module):
     def __init__(self, in_size, latent_size):
@@ -61,12 +64,14 @@ class UsadModel(nn.Module):
         self.decoder1 = USAD_Decoder(z_size, w_size)
         self.decoder2 = USAD_Decoder(z_size, w_size)
 
-    def forward(self, x, alpha=.5, beta=.5):
+    def forward(self, x, alpha=0.5, beta=0.5):
         z = self.encoder(x)
         w1 = self.decoder1(z)
         w2 = self.decoder2(z)
         w3 = self.decoder2(self.encoder(w1))
-        score = alpha * torch.mean((x - w1) ** 2, axis=1) + beta * torch.mean((x - w2) ** 2, axis=1)
+        score = alpha * torch.mean((x - w1) ** 2, axis=1) + beta * torch.mean(
+            (x - w2) ** 2, axis=1
+        )
 
         return z, score, None
 
@@ -75,10 +80,16 @@ class UsadModel(nn.Module):
         w1 = self.decoder1(z)
         w2 = self.decoder2(z)
         w3 = self.decoder2(self.encoder(w1))
-        loss1 = 1 / n * torch.mean((batch - w1) ** 2) + (1 - 1 / n) * torch.mean((batch - w3) ** 2)
-        loss2 = 1 / n * torch.mean((batch - w2) ** 2) - (1 - 1 / n) * torch.mean((batch - w3) ** 2)
-        score = 0.5 * torch.mean((batch - w1) ** 2, axis=1) + 0.5 * torch.mean((batch - w2) ** 2, axis=1)
-        others = {'loss1': loss1, 'loss2': loss2}
+        loss1 = 1 / n * torch.mean((batch - w1) ** 2) + (1 - 1 / n) * torch.mean(
+            (batch - w3) ** 2
+        )
+        loss2 = 1 / n * torch.mean((batch - w2) ** 2) - (1 - 1 / n) * torch.mean(
+            (batch - w3) ** 2
+        )
+        score = 0.5 * torch.mean((batch - w1) ** 2, axis=1) + 0.5 * torch.mean(
+            (batch - w2) ** 2, axis=1
+        )
+        others = {"loss1": loss1, "loss2": loss2}
         return z, score, others
 
     def validation_step(self, batch, n):
@@ -86,31 +97,44 @@ class UsadModel(nn.Module):
         w1 = self.decoder1(z)
         w2 = self.decoder2(z)
         w3 = self.decoder2(self.encoder(w1))
-        loss1 = 1 / n * torch.mean((batch - w1) ** 2) + (1 - 1 / n) * torch.mean((batch - w3) ** 2)
-        loss2 = 1 / n * torch.mean((batch - w2) ** 2) - (1 - 1 / n) * torch.mean((batch - w3) ** 2)
-        return {'val_loss1': loss1, 'val_loss2': loss2}
+        loss1 = 1 / n * torch.mean((batch - w1) ** 2) + (1 - 1 / n) * torch.mean(
+            (batch - w3) ** 2
+        )
+        loss2 = 1 / n * torch.mean((batch - w2) ** 2) - (1 - 1 / n) * torch.mean(
+            (batch - w3) ** 2
+        )
+        return {"val_loss1": loss1, "val_loss2": loss2}
 
     def validation_epoch_end(self, outputs):
-        batch_losses1 = [x['val_loss1'] for x in outputs]
+        batch_losses1 = [x["val_loss1"] for x in outputs]
         epoch_loss1 = torch.stack(batch_losses1).mean()
-        batch_losses2 = [x['val_loss2'] for x in outputs]
+        batch_losses2 = [x["val_loss2"] for x in outputs]
         epoch_loss2 = torch.stack(batch_losses2).mean()
-        return {'val_loss1': epoch_loss1.item(), 'val_loss2': epoch_loss2.item()}
+        return {"val_loss1": epoch_loss1.item(), "val_loss2": epoch_loss2.item()}
 
     def epoch_end(self, epoch, result):
         print(
-            "Epoch [{}], val_loss1: {:.4f}, val_loss2: {:.4f}".format(epoch, result['val_loss1'], result['val_loss2']))
+            "Epoch [{}], val_loss1: {:.4f}, val_loss2: {:.4f}".format(
+                epoch, result["val_loss1"], result["val_loss2"]
+            )
+        )
 
 
 def evaluate(model, val_loader, n):
-    outputs = [model.validation_step(to_device(batch, device), n) for [batch] in val_loader]
+    outputs = [
+        model.validation_step(to_device(batch, device), n) for [batch] in val_loader
+    ]
     return model.validation_epoch_end(outputs)
 
 
 def training(epochs, model, train_loader, val_loader, opt_func=torch.optim.Adam):
     history = []
-    optimizer1 = opt_func(list(model.encoder.parameters()) + list(model.decoder1.parameters()))
-    optimizer2 = opt_func(list(model.encoder.parameters()) + list(model.decoder2.parameters()))
+    optimizer1 = opt_func(
+        list(model.encoder.parameters()) + list(model.decoder1.parameters())
+    )
+    optimizer2 = opt_func(
+        list(model.encoder.parameters()) + list(model.decoder2.parameters())
+    )
     for epoch in range(epochs):
         for x, y in train_loader:
             x = to_device(x, device)
@@ -120,14 +144,14 @@ def training(epochs, model, train_loader, val_loader, opt_func=torch.optim.Adam)
 
             # Train AE1
             feature, logits, others = model.training_step(x, epoch + 1)
-            loss1, loss2 = others['loss1'], others['loss2']
+            loss1, loss2 = others["loss1"], others["loss2"]
             loss1.backward()
             optimizer1.step()
             optimizer1.zero_grad()
 
             # Train AE2
             feature, logits, others = model.training_step(x, epoch + 1)
-            loss1, loss2 = others['loss1'], others['loss2']
+            loss1, loss2 = others["loss1"], others["loss2"]
             loss2.backward()
             optimizer2.step()
             optimizer2.zero_grad()
@@ -138,11 +162,14 @@ def training(epochs, model, train_loader, val_loader, opt_func=torch.optim.Adam)
     return history
 
 
-def testing(model, test_loader, alpha=.5, beta=.5):
+def testing(model, test_loader, alpha=0.5, beta=0.5):
     results = []
     for [batch] in test_loader:
         batch = to_device(batch, device)
         w1 = model.decoder1(model.encoder(batch))
         w2 = model.decoder2(model.encoder(w1))
-        results.append(alpha * torch.mean((batch - w1) ** 2, axis=1) + beta * torch.mean((batch - w2) ** 2, axis=1))
+        results.append(
+            alpha * torch.mean((batch - w1) ** 2, axis=1)
+            + beta * torch.mean((batch - w2) ** 2, axis=1)
+        )
     return results

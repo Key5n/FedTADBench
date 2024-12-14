@@ -8,12 +8,18 @@ from torch.utils.data import DataLoader, Dataset
 
 from algorithms.DeepSVDD.DeepSVDD import BaseNet
 from algorithms.GDN.evaluate import get_err_median_and_iqr
-from algorithms.GDN.gdn_exp_smd import TimeDataset, get_feature_map, get_fc_graph_struc, build_loc_net, construct_data
+from algorithms.GDN.gdn_exp_smd import (
+    TimeDataset,
+    get_feature_map,
+    get_fc_graph_struc,
+    build_loc_net,
+    construct_data,
+)
 from logger import logger
 from options import args, seed_worker
 from task import load_model, config, model_fun
 
-if args.tsadalg == 'deep_svdd':
+if args.tsadalg == "deep_svdd":
     from task.SVDD import config_svdd
 from sklearn.metrics import roc_auc_score, average_precision_score
 import torch.nn.functional as F
@@ -45,7 +51,11 @@ class Client(object):
         return config["optimizer_fun"](model.parameters())
 
     def local_train(
-            self, global_state_dict, global_round, global_grad_correct: dict, global_c: torch.Tensor = None
+        self,
+        global_state_dict,
+        global_round,
+        global_grad_correct: dict,
+        global_c: torch.Tensor = None,
     ):
 
         scheduler = None
@@ -58,7 +68,7 @@ class Client(object):
         #
         model_current = load_model(global_state_dict)
         model_current.requires_grad_(True)
-        if args.tsadalg == 'deep_svdd' and config_svdd['stage'] == 'second':
+        if args.tsadalg == "deep_svdd" and config_svdd["stage"] == "second":
             model_current.c = global_c
         model_current.train()
         model_current.to(args.device)
@@ -69,27 +79,35 @@ class Client(object):
 
         # region Set optimizer and dataloader
         optimizer = self.set_local_optimizer(model_current)
-        if args.tsadalg == 'tran_ad':
+        if args.tsadalg == "tran_ad":
             scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 5, 0.9)
-        if args.tsadalg == 'deep_svdd':
-            scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=(50,), gamma=0.1)
+        if args.tsadalg == "deep_svdd":
+            scheduler = torch.optim.lr_scheduler.MultiStepLR(
+                optimizer, milestones=(50,), gamma=0.1
+            )
         # if self.dataset.data.shape[0] < self.local_bs:
         #     self.local_bs = self.dataset.data.shape[0]
-        if args.tsadalg == 'gdn':
+        if args.tsadalg == "gdn":
             feature_map = get_feature_map(args.dataset)
             fc_struc = get_fc_graph_struc(args.dataset)
-            fc_edge_index = build_loc_net(fc_struc, feature_map, feature_map=feature_map)
+            fc_edge_index = build_loc_net(
+                fc_struc, feature_map, feature_map=feature_map
+            )
             fc_edge_index = torch.tensor(fc_edge_index, dtype=torch.long)
             edge_index_sets = []
             edge_index_sets.append(fc_edge_index)
             train_scaled = self.dataset.data
-            train = pandas.DataFrame(train_scaled, columns=feature_map, dtype=np.float32)
+            train = pandas.DataFrame(
+                train_scaled, columns=feature_map, dtype=np.float32
+            )
             train_dataset_indata = construct_data(train, feature_map, labels=0)
             cfg = {
-                    'slide_win': args.slide_win,
-                    'slide_stride': 1,
+                "slide_win": args.slide_win,
+                "slide_stride": 1,
             }
-            train_dataset = TimeDataset(train_dataset_indata, fc_edge_index, mode='train', config=cfg)
+            train_dataset = TimeDataset(
+                train_dataset_indata, fc_edge_index, mode="train", config=cfg
+            )
             # trainloader = DataLoader(
             #     train_dataset,
             #     batch_size=self.local_bs,
@@ -100,24 +118,21 @@ class Client(object):
             # )
 
             trainloader = DataLoader(
-                    train_dataset, batch_size=self.local_bs,
-                    shuffle=True,
-                    drop_last=False
+                train_dataset, batch_size=self.local_bs, shuffle=True, drop_last=False
             )
         else:
             trainloader = DataLoader(
-                    self.dataset,
-                    batch_size=self.local_bs,
-                    shuffle=True,
-                    pin_memory=True,
-                    num_workers=args.num_workers,
-                    drop_last=False
+                self.dataset,
+                batch_size=self.local_bs,
+                shuffle=True,
+                pin_memory=True,
+                num_workers=args.num_workers,
+                drop_last=False,
             )
 
-        if args.tsadalg == 'deep_svdd' and config_svdd['stage'] == 'second':
+        if args.tsadalg == "deep_svdd" and config_svdd["stage"] == "second":
 
             def init_center_c(train_loader: DataLoader, net: BaseNet, eps=0.1):
-
                 """Initialize hypersphere center c as the mean from an initial forward pass on the data."""
                 n_samples = 0
                 c = torch.zeros(net.rep_dim).to(args.device)
@@ -146,7 +161,7 @@ class Client(object):
             model_current.c = init_center_c(trainloader, model_current)
             self.state_dict_prev = None
         # endregion
-        if args.tsadalg != 'gdn' and args.tsadalg != 'usad':
+        if args.tsadalg != "gdn" and args.tsadalg != "usad":
             l1s = []
             for local_epoch in range(self.local_ep):
                 loss1_list = []
@@ -157,7 +172,7 @@ class Client(object):
                     x, y = x.to(args.device), y.to(args.device)
 
                     optimizer.zero_grad()
-                    if args.tsadalg == 'tran_ad':
+                    if args.tsadalg == "tran_ad":
                         local_bs = x.shape[0]
                         feats = x.shape[-1]
                         window = x.permute(1, 0, 2)
@@ -166,38 +181,52 @@ class Client(object):
                     else:
                         feature, logits, others = model_current(x)
 
-                    if 'output' in others.keys() and not (args.tsadalg == 'deep_svdd' and config_svdd['stage'] == 'second'):
-                        pred_y = others['output']
-                        if np.any(np.isnan(pred_y.detach().cpu().numpy())) or np.any(np.isnan(y.detach().cpu().numpy())):
-                            print('nan exists in y_pred or y')
+                    if "output" in others.keys() and not (
+                        args.tsadalg == "deep_svdd" and config_svdd["stage"] == "second"
+                    ):
+                        pred_y = others["output"]
+                        if np.any(np.isnan(pred_y.detach().cpu().numpy())) or np.any(
+                            np.isnan(y.detach().cpu().numpy())
+                        ):
+                            print("nan exists in y_pred or y")
                         if len(pred_y.shape) == 3:
                             loss = self.criterion(pred_y[:, -1, :], y)
                         else:
                             loss = self.criterion(pred_y, y)
-                    elif 'x1' in others.keys() and not (args.tsadalg == 'deep_svdd' and config_svdd['stage'] == 'second'):
-                        l = nn.MSELoss(reduction='none')
+                    elif "x1" in others.keys() and not (
+                        args.tsadalg == "deep_svdd" and config_svdd["stage"] == "second"
+                    ):
+                        l = nn.MSELoss(reduction="none")
                         n = local_epoch + 1
-                        z = (others['x1'], others['x2'])
-                        l1 = l(z, elem) if not isinstance(z, tuple) else (1 / n) * l(z[0], elem) + (1 - 1 / n) * l(
-                                z[1],
-                                elem
+                        z = (others["x1"], others["x2"])
+                        l1 = (
+                            l(z, elem)
+                            if not isinstance(z, tuple)
+                            else (1 / n) * l(z[0], elem) + (1 - 1 / n) * l(z[1], elem)
                         )
-                        if isinstance(z, tuple): z = z[1]
+                        if isinstance(z, tuple):
+                            z = z[1]
                         l1s.append(torch.mean(l1).item())
                         loss = torch.mean(l1)
-                    elif 'loss' in others.keys() and not (args.tsadalg == 'deep_svdd' and config_svdd['stage'] == 'second'):
-                        loss = others['loss']
-                    elif args.tsadalg == 'deep_svdd' and config_svdd['stage'] == 'second':
-                        dist = torch.sum((logits[:, -1, :] - model_current.c) ** 2, dim=1)
+                    elif "loss" in others.keys() and not (
+                        args.tsadalg == "deep_svdd" and config_svdd["stage"] == "second"
+                    ):
+                        loss = others["loss"]
+                    elif (
+                        args.tsadalg == "deep_svdd" and config_svdd["stage"] == "second"
+                    ):
+                        dist = torch.sum(
+                            (logits[:, -1, :] - model_current.c) ** 2, dim=1
+                        )
                         loss = torch.mean(dist)
-                    if args.alg == 'moon' and self.state_dict_prev is not None:
+                    if args.alg == "moon" and self.state_dict_prev is not None:
                         model_prev = load_model(
-                                self.state_dict_prev,
+                            self.state_dict_prev,
                         )
                         model_prev.requires_grad_(False)
                         model_prev.eval()
                         model_prev.to(args.device)
-                        if args.tsadalg == 'tran_ad':
+                        if args.tsadalg == "tran_ad":
                             local_bs = x.shape[0]
                             feats = x.shape[-1]
                             window = x.permute(1, 0, 2)
@@ -208,22 +237,30 @@ class Client(object):
                             feature_prev, _, _ = model_prev(x)
                             feature_global, _, _ = model_global(x)
                         featture_flatten = torch.flatten(feature, start_dim=1)
-                        feature_global_flatten = torch.flatten(feature_global, start_dim=1)
+                        feature_global_flatten = torch.flatten(
+                            feature_global, start_dim=1
+                        )
                         feature_prev_flatten = torch.flatten(feature_prev, start_dim=1)
                         posi = self.cos_sim(featture_flatten, feature_global_flatten)
                         logits_moon = posi.reshape(-1, 1)
                         nega = self.cos_sim(featture_flatten, feature_prev_flatten)
-                        logits_moon = torch.cat((logits_moon, nega.reshape(-1, 1)), dim=1)
+                        logits_moon = torch.cat(
+                            (logits_moon, nega.reshape(-1, 1)), dim=1
+                        )
                         logits_moon /= self.temperature
                         loss_con = F.cross_entropy(
-                                logits_moon,
-                                torch.zeros(x.size(0), device=args.device, dtype=torch.long)
+                            logits_moon,
+                            torch.zeros(
+                                x.size(0), device=args.device, dtype=torch.long
+                            ),
                         )
                         loss = loss + self.moon_mu * loss_con
 
-                    if args.alg == 'fedprox':
+                    if args.alg == "fedprox":
                         proximal_term = 0
-                        for w, w_0 in zip(model_current.parameters(), model_global.parameters()):
+                        for w, w_0 in zip(
+                            model_current.parameters(), model_global.parameters()
+                        ):
                             proximal_term += (w - w_0).norm(2)
                         loss += proximal_term * self.prox_mu / 2
 
@@ -231,13 +268,13 @@ class Client(object):
                     optimizer.step()
 
                     # correct grad
-                    if args.alg == 'scaffold':
+                    if args.alg == "scaffold":
                         state_dict_current = model_current.state_dict()
-                        lr = optimizer.state_dict()['param_groups'][-1]['lr']
+                        lr = optimizer.state_dict()["param_groups"][-1]["lr"]
                         for key in state_dict_current:
                             # if not state_dict_current[key].requires_grad:
                             #     continue
-                            if key == 'pos_encoder.pe':
+                            if key == "pos_encoder.pe":
                                 continue
                             c_global = global_grad_correct[key].to(args.device)
                             c_local = self.grad_correct[key].to(args.device)
@@ -250,15 +287,15 @@ class Client(object):
                 epoch_loss.append(sum(batch_loss) / len(batch_loss))
                 if args.verbose:
                     logger.print(
-                            f'| Global Round : {global_round} | Local Epoch : {local_epoch} |' +
-                            f' Training Loss: {loss.item():.6f}\t'
-                            # + f' Training Accuracy: {train_acc[-1]:.6f}'
+                        f"| Global Round : {global_round} | Local Epoch : {local_epoch} |"
+                        + f" Training Loss: {loss.item():.6f}\t"
+                        # + f' Training Accuracy: {train_acc[-1]:.6f}'
                     )
                 # endregion
 
                 if scheduler is not None:
                     scheduler.step()
-        elif args.tsadalg == 'usad':
+        elif args.tsadalg == "usad":
             losses1 = []
             losses2 = []
             for local_epoch in range(self.local_ep):
@@ -266,8 +303,14 @@ class Client(object):
                 correct = 0
                 num_data = 0
                 opt_func = torch.optim.Adam
-                optimizer1 = opt_func(list(model_current.encoder.parameters()) + list(model_current.decoder1.parameters()))
-                optimizer2 = opt_func(list(model_current.encoder.parameters()) + list(model_current.decoder2.parameters()))
+                optimizer1 = opt_func(
+                    list(model_current.encoder.parameters())
+                    + list(model_current.decoder1.parameters())
+                )
+                optimizer2 = opt_func(
+                    list(model_current.encoder.parameters())
+                    + list(model_current.decoder2.parameters())
+                )
                 for i, (x, y) in enumerate(trainloader):
                     x, y = x.to(args.device), y.to(args.device)
                     x = x.view([x.shape[0], x.shape[1] * x.shape[2]])
@@ -275,10 +318,12 @@ class Client(object):
 
                     optimizer1.zero_grad()
                     _, _, others = model_current.training_step(x, local_epoch + 1)
-                    loss1, _ = others['loss1'], others['loss2']
-                    if args.alg == 'fedprox':
+                    loss1, _ = others["loss1"], others["loss2"]
+                    if args.alg == "fedprox":
                         proximal_term = 0
-                        for w, w_0 in zip(model_current.parameters(), model_global.parameters()):
+                        for w, w_0 in zip(
+                            model_current.parameters(), model_global.parameters()
+                        ):
                             proximal_term = proximal_term + (w - w_0).norm(2)
                         loss1 = loss1 + proximal_term * self.prox_mu / 2
                     loss1.backward()
@@ -287,17 +332,21 @@ class Client(object):
                     optimizer1.zero_grad()
                     loss_stat += float(loss1.item())
 
-                    feature, logits, others = model_current.training_step(x, local_epoch + 1)
-                    _, loss2 = others['loss1'], others['loss2']
-                    if args.alg == 'fedprox':
+                    feature, logits, others = model_current.training_step(
+                        x, local_epoch + 1
+                    )
+                    _, loss2 = others["loss1"], others["loss2"]
+                    if args.alg == "fedprox":
                         proximal_term = 0
-                        for w, w_0 in zip(model_current.parameters(), model_global.parameters()):
+                        for w, w_0 in zip(
+                            model_current.parameters(), model_global.parameters()
+                        ):
                             proximal_term = proximal_term + (w - w_0).norm(2)
                         loss2 = loss2 + proximal_term * self.prox_mu / 2
 
-                    if args.alg == 'moon' and self.state_dict_prev is not None:
+                    if args.alg == "moon" and self.state_dict_prev is not None:
                         model_prev = load_model(
-                                self.state_dict_prev,
+                            self.state_dict_prev,
                         )
                         model_prev.requires_grad_(False)
                         model_prev.eval()
@@ -307,11 +356,15 @@ class Client(object):
                         posi = self.cos_sim(feature, feature_global)
                         logits_moon = posi.reshape(-1, 1)
                         nega = self.cos_sim(feature, feature_prev)
-                        logits_moon = torch.cat((logits_moon, nega.reshape(-1, 1)), dim=1)
+                        logits_moon = torch.cat(
+                            (logits_moon, nega.reshape(-1, 1)), dim=1
+                        )
                         logits_moon /= self.temperature
                         loss_con = F.cross_entropy(
                             logits_moon,
-                            torch.zeros(x.size(0), device=args.device, dtype=torch.long)
+                            torch.zeros(
+                                x.size(0), device=args.device, dtype=torch.long
+                            ),
                         )
                         loss2 = loss2 + self.moon_mu * loss_con
                     loss2.backward()
@@ -320,9 +373,9 @@ class Client(object):
                     optimizer2.step()
                     optimizer2.zero_grad()
                     # correct grad
-                    if args.alg == 'scaffold':
+                    if args.alg == "scaffold":
                         state_dict_current = model_current.state_dict()
-                        lr = optimizer.state_dict()['param_groups'][-1]['lr']
+                        lr = optimizer.state_dict()["param_groups"][-1]["lr"]
                         for key in state_dict_current:
                             c_global = global_grad_correct[key].to(args.device)
                             c_local = self.grad_correct[key].to(args.device)
@@ -335,8 +388,9 @@ class Client(object):
                 # endregion
                 if args.verbose:
                     logger.print(
-                            f'| Global Round : {global_round} | Local Epoch : {local_epoch} |' +
-                            f' Training Loss 1: {loss1.item():.6f} |' + f' Training Loss 2: {loss2.item():.6f}\t'
+                        f"| Global Round : {global_round} | Local Epoch : {local_epoch} |"
+                        + f" Training Loss 1: {loss1.item():.6f} |"
+                        + f" Training Loss 2: {loss2.item():.6f}\t"
                     )
                 # endregion
         else:
@@ -345,50 +399,60 @@ class Client(object):
                 correct = 0
                 num_data = 0
                 for i, (x, labels, attack_labels, edge_index) in enumerate(trainloader):
-                    x, labels, edge_index = [item.float().to(args.device) for item in [x, labels, edge_index]]
+                    x, labels, edge_index = [
+                        item.float().to(args.device) for item in [x, labels, edge_index]
+                    ]
                     #
                     optimizer.zero_grad()
                     feature, logits, loss = model_current(x, edge_index, labels)
 
-                    if args.alg == 'moon' and self.state_dict_prev is not None:
+                    if args.alg == "moon" and self.state_dict_prev is not None:
                         model_prev = load_model(
-                                self.state_dict_prev,
+                            self.state_dict_prev,
                         )
                         model_prev.requires_grad_(False)
                         model_prev.eval()
                         model_prev.to(args.device)
-                        if args.tsadalg == 'gdn':
+                        if args.tsadalg == "gdn":
                             feature_prev, _, _ = model_prev(x, edge_index, labels)
                             feature_global, _, _ = model_global(x, edge_index, labels)
                         else:
                             feature_prev, _, _ = model_prev(x)
                             feature_global, _, _ = model_global(x)
                         feature_flatten = torch.flatten(feature, start_dim=1)
-                        feature_global_flatten = torch.flatten(feature_global, start_dim=1)
+                        feature_global_flatten = torch.flatten(
+                            feature_global, start_dim=1
+                        )
                         feature_prev_flatten = torch.flatten(feature_prev, start_dim=1)
                         posi = self.cos_sim(feature_flatten, feature_global_flatten)
                         logits_moon = posi.reshape(-1, 1)
                         nega = self.cos_sim(feature_flatten, feature_prev_flatten)
-                        logits_moon = torch.cat((logits_moon, nega.reshape(-1, 1)), dim=1)
+                        logits_moon = torch.cat(
+                            (logits_moon, nega.reshape(-1, 1)), dim=1
+                        )
                         logits_moon /= self.temperature
                         loss_con = F.cross_entropy(
-                                logits_moon,
-                                torch.zeros(x.size(0), device=args.device, dtype=torch.long)
+                            logits_moon,
+                            torch.zeros(
+                                x.size(0), device=args.device, dtype=torch.long
+                            ),
                         )
                         loss = loss + self.moon_mu * loss_con
 
-                    if args.alg == 'fedprox':
+                    if args.alg == "fedprox":
                         proximal_term = 0
-                        for w, w_0 in zip(model_current.parameters(), model_global.parameters()):
+                        for w, w_0 in zip(
+                            model_current.parameters(), model_global.parameters()
+                        ):
                             proximal_term += (w - w_0).norm(2)
                         loss += proximal_term * self.prox_mu / 2
 
                     loss.backward()
                     optimizer.step()
                     # correct grad
-                    if args.alg == 'scaffold':
+                    if args.alg == "scaffold":
                         state_dict_current = model_current.state_dict()
-                        lr = optimizer.state_dict()['param_groups'][-1]['lr']
+                        lr = optimizer.state_dict()["param_groups"][-1]["lr"]
                         for key in state_dict_current:
 
                             try:
@@ -407,16 +471,16 @@ class Client(object):
                     scheduler.step()
                 if args.verbose:
                     logger.print(
-                            f'| Global Round : {global_round} | Local Epoch : {local_epoch} |' +
-                            f' Training Loss: {loss.item():.6f}\t'
+                        f"| Global Round : {global_round} | Local Epoch : {local_epoch} |"
+                        + f" Training Loss: {loss.item():.6f}\t"
                     )
                 # endregion
 
-        if args.tsadalg != 'usad':
+        if args.tsadalg != "usad":
             mean_loss = sum(epoch_loss) / len(epoch_loss)
 
         # region
-        if args.alg == 'scaffold':
+        if args.alg == "scaffold":
 
             c_delta_local = {}
             state_global = model_global.state_dict()
@@ -424,8 +488,15 @@ class Client(object):
 
             for key in self.grad_correct.keys():
                 old_c = self.grad_correct[key].to(args.device)
-                new_c = old_c - global_grad_correct[key].to(args.device) + \
-                        (state_global[key].to(args.device) - state_current[key].to(args.device)) / (len(trainloader) * self.local_ep * lr)
+                new_c = (
+                    old_c
+                    - global_grad_correct[key].to(args.device)
+                    + (
+                        state_global[key].to(args.device)
+                        - state_current[key].to(args.device)
+                    )
+                    / (len(trainloader) * self.local_ep * lr)
+                )
                 self.grad_correct[key] = new_c.cpu()
                 c_delta_local[key] = (new_c - old_c).cpu()
         else:
@@ -436,9 +507,9 @@ class Client(object):
         self.state_dict_prev = model_current.state_dict()
         # endregion
 
-        if args.tsadalg == 'deep_svdd' and config_svdd['stage'] == 'second':
+        if args.tsadalg == "deep_svdd" and config_svdd["stage"] == "second":
             return float(mean_loss), None, c_delta_local, model_current.c
-        elif args.tsadalg == 'usad':
+        elif args.tsadalg == "usad":
             return float(mean_loss1), float(mean_loss2), c_delta_local
         else:
             return float(mean_loss), None, c_delta_local
@@ -452,11 +523,11 @@ def generate_clients(datasets: List[Dataset]) -> List[Client]:
 
 
 @torch.no_grad()
-def test_inference(model, dataset, score_save_path=''):
+def test_inference(model, dataset, score_save_path=""):
     model.eval()
     num_data = 0
     correct = 0
-    if args.tsadalg == 'gdn':
+    if args.tsadalg == "gdn":
         feature_map = get_feature_map(args.dataset)
         fc_struc = get_fc_graph_struc(args.dataset)
         fc_edge_index = build_loc_net(fc_struc, feature_map, feature_map=feature_map)
@@ -467,54 +538,57 @@ def test_inference(model, dataset, score_save_path=''):
         test = pandas.DataFrame(test_scaled, columns=feature_map, dtype=np.float32)
         test_dataset_indata = construct_data(test, feature_map, labels=0)
         cfg = {
-                'slide_win': args.slide_win,
-                'slide_stride': 1,
+            "slide_win": args.slide_win,
+            "slide_stride": 1,
         }
-        test_dataset = TimeDataset(test_dataset_indata, fc_edge_index, mode='test', config=cfg)
+        test_dataset = TimeDataset(
+            test_dataset_indata, fc_edge_index, mode="test", config=cfg
+        )
         if len(dataset.target.shape) == 1:
             test_dataset.labels = torch.tensor(dataset.target[:])
         elif len(dataset.target.shape) == 2:
-            test_dataset.labels = torch.tensor(dataset.target[args.slide_win:, 0])
+            test_dataset.labels = torch.tensor(dataset.target[args.slide_win :, 0])
 
         testloader = DataLoader(
-                test_dataset, batch_size=128,
-                shuffle=False,
-                drop_last=False
+            test_dataset, batch_size=128, shuffle=False, drop_last=False
         )
     else:
         testloader = DataLoader(
-                dataset,
-                batch_size=128,
-                shuffle=False,
-                num_workers=args.num_workers,
-                worker_init_fn=seed_worker,
-                drop_last=False
+            dataset,
+            batch_size=128,
+            shuffle=False,
+            num_workers=args.num_workers,
+            worker_init_fn=seed_worker,
+            drop_last=False,
         )
     criterion = nn.MSELoss()
     loss = []
     anomaly_scores_all = []
     labels_all = []
-    if args.tsadalg != 'gdn':
+    if args.tsadalg != "gdn":
         for i, (x, labels) in enumerate(testloader):
             x = x.to(args.device)
             labels = labels.to(args.device)
-            if args.tsadalg == 'tran_ad':
+            if args.tsadalg == "tran_ad":
                 local_bs = x.shape[0]
                 feats = x.shape[-1]
                 window = x.permute(1, 0, 2)
                 elem = window[-1, :, :].view(1, local_bs, feats)
                 feature, logits, others = model(window, elem)
             else:
-                if args.tsadalg == 'usad':
+                if args.tsadalg == "usad":
                     x = x.view(x.shape[0], x.shape[1] * x.shape[2])
                 feature, logits, others = model(x)
-            if args.tsadalg == 'deep_svdd':
+            if args.tsadalg == "deep_svdd":
                 if len(feature.shape) == 3:
                     feature = feature[:, -1, :]
-                logits = torch.sum((feature - model.c.to(torch.device(args.device))) ** 2, dim=1)
-            elif args.tsadalg == 'tran_ad':
-                z = (others['x1'], others['x2'])
-                if isinstance(z, tuple): z = z[1]
+                logits = torch.sum(
+                    (feature - model.c.to(torch.device(args.device))) ** 2, dim=1
+                )
+            elif args.tsadalg == "tran_ad":
+                z = (others["x1"], others["x2"])
+                if isinstance(z, tuple):
+                    z = z[1]
                 logits = z[0]
             anomaly_scores_all.append(logits)
             if isinstance(labels, list):
@@ -523,19 +597,20 @@ def test_inference(model, dataset, score_save_path=''):
                 labels_all.append(labels)
             else:
                 labels_all.append(torch.squeeze(labels, dim=1))
-            if others is not None and 'output' in others.keys():
-                loss.append(criterion(others['output'], x[:, -1, :]).item())
+            if others is not None and "output" in others.keys():
+                loss.append(criterion(others["output"], x[:, -1, :]).item())
         anomaly_scores_all = torch.cat(anomaly_scores_all, dim=0)
     else:
+
         def get_err_scores_gdn_federated(test_predict, test_gt):
 
             n_err_mid, n_err_iqr = get_err_median_and_iqr(test_predict, test_gt)
 
             test_delta = np.abs(
-                    np.subtract(
-                            np.array(test_predict).astype(np.float64),
-                            np.array(test_gt).astype(np.float64)
-                    )
+                np.subtract(
+                    np.array(test_predict).astype(np.float64),
+                    np.array(test_gt).astype(np.float64),
+                )
             )
             epsilon = 1e-2
 
@@ -544,7 +619,7 @@ def test_inference(model, dataset, score_save_path=''):
             smoothed_err_scores = np.zeros(err_scores.shape)
             before_num = 3
             for i in range(before_num, len(err_scores)):
-                smoothed_err_scores[i] = np.mean(err_scores[i - before_num:i + 1])
+                smoothed_err_scores[i] = np.mean(err_scores[i - before_num : i + 1])
 
             return smoothed_err_scores
 
@@ -563,12 +638,7 @@ def test_inference(model, dataset, score_save_path=''):
                 if all_scores is None:
                     all_scores = scores
                 else:
-                    all_scores = np.vstack(
-                            (
-                                    all_scores,
-                                    scores
-                            )
-                    )
+                    all_scores = np.vstack((all_scores, scores))
 
             return all_scores
 
@@ -583,12 +653,17 @@ def test_inference(model, dataset, score_save_path=''):
             loss.append(loss_this)
         preds = torch.cat(preds, dim=0)
         xs = torch.cat(xs, dim=0)
-        anomaly_scores_all = get_full_err_scores_gdn_federated(preds.detach().cpu().numpy(), xs.detach().cpu().numpy(), labels)
+        anomaly_scores_all = get_full_err_scores_gdn_federated(
+            preds.detach().cpu().numpy(), xs.detach().cpu().numpy(), labels
+        )
         total_features = anomaly_scores_all.shape[0]
         topk = 1
-        topk_indices = np.argpartition(anomaly_scores_all, range(total_features - topk - 1, total_features), axis=0)[
-                       -topk:]
-        anomaly_scores_all = np.sum(np.take_along_axis(anomaly_scores_all, topk_indices, axis=0), axis=0)
+        topk_indices = np.argpartition(
+            anomaly_scores_all, range(total_features - topk - 1, total_features), axis=0
+        )[-topk:]
+        anomaly_scores_all = np.sum(
+            np.take_along_axis(anomaly_scores_all, topk_indices, axis=0), axis=0
+        )
     labels_all = torch.cat(labels_all, dim=0)
     labels_all_numpy = labels_all.detach().cpu().numpy()
     if isinstance(anomaly_scores_all, torch.Tensor):
@@ -613,7 +688,7 @@ def test_inference_pretrain(model, dataset):
     model.eval()
     num_data = 0
     correct = 0
-    if args.tsadalg == 'gdn':
+    if args.tsadalg == "gdn":
         feature_map = get_feature_map(args.dataset)
         fc_struc = get_fc_graph_struc(args.dataset)
         fc_edge_index = build_loc_net(fc_struc, feature_map, feature_map=feature_map)
@@ -624,34 +699,34 @@ def test_inference_pretrain(model, dataset):
         test = pandas.DataFrame(test_scaled, columns=feature_map, dtype=np.float32)
         test_dataset_indata = construct_data(test, feature_map, labels=0)
         cfg = {
-                'slide_win': args.slide_win,
-                'slide_stride': 1,
+            "slide_win": args.slide_win,
+            "slide_stride": 1,
         }
-        test_dataset = TimeDataset(test_dataset_indata, fc_edge_index, mode='test', config=cfg)
+        test_dataset = TimeDataset(
+            test_dataset_indata, fc_edge_index, mode="test", config=cfg
+        )
         if len(dataset.target.shape) == 1:
             test_dataset.labels = torch.tensor(dataset.target[:])
         elif len(dataset.target.shape) == 2:
-            test_dataset.labels = torch.tensor(dataset.target[args.slide_win:, 0])
+            test_dataset.labels = torch.tensor(dataset.target[args.slide_win :, 0])
         testloader = DataLoader(
-                test_dataset, batch_size=128,
-                shuffle=False,
-                drop_last=False
+            test_dataset, batch_size=128, shuffle=False, drop_last=False
         )
     else:
         testloader = DataLoader(
-                dataset,
-                batch_size=128,
-                shuffle=False,
-                num_workers=args.num_workers,
-                worker_init_fn=seed_worker,
-                drop_last=False
-                # generator=g,
+            dataset,
+            batch_size=128,
+            shuffle=False,
+            num_workers=args.num_workers,
+            worker_init_fn=seed_worker,
+            drop_last=False,
+            # generator=g,
         )
     criterion = nn.MSELoss()
     loss = []
     anomaly_scores_all = []
     labels_all = []
-    if args.tsadalg != 'gdn':
+    if args.tsadalg != "gdn":
         for i, (x, labels) in enumerate(testloader):
             x = x.to(args.device)
             labels = labels.to(args.device)
@@ -664,19 +739,20 @@ def test_inference_pretrain(model, dataset):
                 labels_all.append(labels)
             else:
                 labels_all.append(torch.squeeze(labels, dim=1))
-            if 'output' in others.keys():
-                loss.append(criterion(others['output'], x[:, -1, :]).item())
+            if "output" in others.keys():
+                loss.append(criterion(others["output"], x[:, -1, :]).item())
         anomaly_scores_all = torch.cat(anomaly_scores_all, dim=0)
     else:
+
         def get_err_scores_gdn_federated(test_predict, test_gt):
 
             n_err_mid, n_err_iqr = get_err_median_and_iqr(test_predict, test_gt)
 
             test_delta = np.abs(
-                    np.subtract(
-                            np.array(test_predict).astype(np.float64),
-                            np.array(test_gt).astype(np.float64)
-                    )
+                np.subtract(
+                    np.array(test_predict).astype(np.float64),
+                    np.array(test_gt).astype(np.float64),
+                )
             )
             epsilon = 1e-2
 
@@ -685,7 +761,7 @@ def test_inference_pretrain(model, dataset):
             smoothed_err_scores = np.zeros(err_scores.shape)
             before_num = 3
             for i in range(before_num, len(err_scores)):
-                smoothed_err_scores[i] = np.mean(err_scores[i - before_num:i + 1])
+                smoothed_err_scores[i] = np.mean(err_scores[i - before_num : i + 1])
 
             return smoothed_err_scores
 
@@ -704,12 +780,7 @@ def test_inference_pretrain(model, dataset):
                 if all_scores is None:
                     all_scores = scores
                 else:
-                    all_scores = np.vstack(
-                            (
-                                    all_scores,
-                                    scores
-                            )
-                    )
+                    all_scores = np.vstack((all_scores, scores))
 
             return all_scores
 
@@ -724,12 +795,17 @@ def test_inference_pretrain(model, dataset):
             loss.append(loss_this)
         preds = torch.cat(preds, dim=0)
         xs = torch.cat(xs, dim=0)
-        anomaly_scores_all = get_full_err_scores_gdn_federated(preds.detach().cpu().numpy(), xs.detach().cpu().numpy(), labels)
+        anomaly_scores_all = get_full_err_scores_gdn_federated(
+            preds.detach().cpu().numpy(), xs.detach().cpu().numpy(), labels
+        )
         total_features = anomaly_scores_all.shape[0]
         topk = 1
-        topk_indices = np.argpartition(anomaly_scores_all, range(total_features - topk - 1, total_features), axis=0)[
-                       -topk:]
-        anomaly_scores_all = np.sum(np.take_along_axis(anomaly_scores_all, topk_indices, axis=0), axis=0)
+        topk_indices = np.argpartition(
+            anomaly_scores_all, range(total_features - topk - 1, total_features), axis=0
+        )[-topk:]
+        anomaly_scores_all = np.sum(
+            np.take_along_axis(anomaly_scores_all, topk_indices, axis=0), axis=0
+        )
     labels_all = torch.cat(labels_all, dim=0)
     labels_all_numpy = labels_all.detach().cpu().numpy()
     if isinstance(anomaly_scores_all, torch.Tensor):

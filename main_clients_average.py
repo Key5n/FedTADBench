@@ -6,7 +6,12 @@ import time
 import numpy as np
 from tqdm import tqdm
 
-from algorithms.GDN.gdn_exp_smd import get_feature_map, get_fc_graph_struc, build_loc_net, GDN
+from algorithms.GDN.gdn_exp_smd import (
+    get_feature_map,
+    get_fc_graph_struc,
+    build_loc_net,
+    GDN,
+)
 from convert_time import convert_time
 from options import args, features_dict, gdn_topk_dict
 
@@ -19,7 +24,7 @@ set_random_seed(args.seed)
 
 
 torch.backends.cudnn.benchmark = False
-os.environ['CUBLAS_WORKSPACE_CONFIG']=':16:8'
+os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":16:8"
 torch.use_deterministic_algorithms(True)
 
 from task import test_dataset, model_fun, client_datasets
@@ -42,17 +47,30 @@ def average_main():
     for cc in range(len(clients)):
         client = clients[cc]
         data_nums.append(len(client.dataset))
-        model, best_auc_roc, best_auc_pr, last_auc_roc, last_auc_pr, client_times = client.local_train(model_fun, client_idx=cc, test_dataset=test_dataset)
+        model, best_auc_roc, best_auc_pr, last_auc_roc, last_auc_pr, client_times = (
+            client.local_train(model_fun, client_idx=cc, test_dataset=test_dataset)
+        )
         time_client_end = time.time()
         best_auc_rocs.append(best_auc_roc)
         best_auc_prs.append(best_auc_pr)
         last_auc_rocs.append(last_auc_roc)
         last_auc_prs.append(last_auc_pr)
         times.append(mean(client_times))
-        print('Client', cc, 'best_auc_roc', best_auc_roc, 'best_auc_pr', best_auc_pr, 'last_auc_roc', last_auc_roc, 'last_auc_pr', last_auc_pr)
-        print('max time till now:', max(times))
+        print(
+            "Client",
+            cc,
+            "best_auc_roc",
+            best_auc_roc,
+            "best_auc_pr",
+            best_auc_pr,
+            "last_auc_roc",
+            last_auc_roc,
+            "last_auc_pr",
+            last_auc_pr,
+        )
+        print("max time till now:", max(times))
 
-    logger.print(f' \n Last Results:')
+    logger.print(f" \n Last Results:")
 
     print(f"Best Average AUC-ROC: {mean(best_auc_rocs)}")
     print(f"Best Average AP: {mean(best_auc_prs)}")
@@ -69,5 +87,5 @@ def average_main():
         pass
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     average_main()

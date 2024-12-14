@@ -1,6 +1,10 @@
 from sklearn.metrics import mean_squared_error, average_precision_score
-from algorithms.GDN.evaluate import get_best_performance_data, get_val_performance_data, get_full_err_scores, \
-    get_full_err_scores_only_test
+from algorithms.GDN.evaluate import (
+    get_best_performance_data,
+    get_val_performance_data,
+    get_full_err_scores,
+    get_full_err_scores_only_test,
+)
 from sklearn.metrics import precision_score, recall_score, roc_auc_score, f1_score
 import math
 from datetime import datetime
@@ -17,15 +21,16 @@ from numpy import percentile
 # preprocess data
 import numpy as np
 
+
 def get_most_common_features(target, all_features, max=3, min=3):
     res = []
-    main_keys = target.split('_')
+    main_keys = target.split("_")
 
     for feature in all_features:
         if target == feature:
             continue
 
-        f_keys = feature.split('_')
+        f_keys = feature.split("_")
         common_key_num = len(list(set(f_keys) & set(main_keys)))
 
         if common_key_num >= min and common_key_num <= max:
@@ -36,11 +41,8 @@ def get_most_common_features(target, all_features, max=3, min=3):
 
 def build_net(target, all_features):
     # get edge_indexes, and index_feature_map
-    main_keys = target.split('_')
-    edge_indexes = [
-        [],
-        []
-    ]
+    main_keys = target.split("_")
+    edge_indexes = [[], []]
     index_feature_map = [target]
 
     # find closest features(nodes):
@@ -86,7 +88,7 @@ def construct_data(data, feature_map, labels=0):
         if feature in data.columns:
             res.append(data.loc[:, feature].values.tolist())
         else:
-            print(feature, 'not exist in data')
+            print(feature, "not exist in data")
     # append labels as last
     sample_n = len(res[0])
 
@@ -100,10 +102,7 @@ def construct_data(data, feature_map, labels=0):
 
 def build_loc_net(struc, all_features, feature_map=[]):
     index_feature_map = feature_map
-    edge_indexes = [
-        [],
-        []
-    ]
+    edge_indexes = [[], []]
     for node_name, node_list in struc.items():
         if node_name not in all_features:
             continue
@@ -117,7 +116,7 @@ def build_loc_net(struc, all_features, feature_map=[]):
                 continue
 
             if child not in index_feature_map:
-                print(f'error: {child} not in index_feature_map')
+                print(f"error: {child} not in index_feature_map")
                 # index_feature_map.append(child)
 
             c_index = index_feature_map.index(child)
@@ -156,7 +155,7 @@ def eval_scores(scores, true_scores, th_steps, return_thresold=False):
     if len(padding_list) > 0:
         scores = padding_list + scores
 
-    scores_sorted = rankdata(scores, method='ordinal')
+    scores_sorted = rankdata(scores, method="ordinal")
     th_steps = th_steps
     # th_steps = 500
     th_vals = np.array(range(th_steps)) * 1.0 / th_steps
@@ -199,7 +198,9 @@ def get_err_median_and_quantile(predicted, groundtruth, percentage):
 
     err_median = np.median(np_arr)
     # err_iqr = iqr(np_arr)
-    err_delta = percentile(np_arr, int(percentage * 100)) - percentile(np_arr, int((1 - percentage) * 100))
+    err_delta = percentile(np_arr, int(percentage * 100)) - percentile(
+        np_arr, int((1 - percentage) * 100)
+    )
 
     return err_median, err_delta
 
@@ -209,7 +210,9 @@ def get_err_mean_and_quantile(predicted, groundtruth, percentage):
 
     err_median = trim_mean(np_arr, percentage)
     # err_iqr = iqr(np_arr)
-    err_delta = percentile(np_arr, int(percentage * 100)) - percentile(np_arr, int((1 - percentage) * 100))
+    err_delta = percentile(np_arr, int(percentage * 100)) - percentile(
+        np_arr, int((1 - percentage) * 100)
+    )
 
     return err_median, err_delta
 
@@ -232,14 +235,14 @@ def get_f1_score(scores, gt, contamination):
     if len(padding_list) > 0:
         scores = padding_list + scores
 
-    pred_labels = (scores > threshold).astype('int').ravel()
+    pred_labels = (scores > threshold).astype("int").ravel()
 
     return f1_score(gt, pred_labels)
 
 
 def test(model, dataloader):
     # test
-    loss_func = nn.MSELoss(reduction='mean')
+    loss_func = nn.MSELoss(reduction="mean")
     device = get_device()
 
     test_loss_list = []
@@ -260,7 +263,9 @@ def test(model, dataloader):
     i = 0
     acu_loss = 0
     for x, y, labels, edge_index in dataloader:
-        x, y, labels, edge_index = [item.to(device).float() for item in [x, y, labels, edge_index]]
+        x, y, labels, edge_index = [
+            item.to(device).float() for item in [x, y, labels, edge_index]
+        ]
 
         with torch.no_grad():
 
@@ -272,7 +277,9 @@ def test(model, dataloader):
                 t_test_ground_list = y
                 t_test_labels_list = labels
             else:
-                t_test_predicted_list = torch.cat((t_test_predicted_list, predicted), dim=0)
+                t_test_predicted_list = torch.cat(
+                    (t_test_predicted_list, predicted), dim=0
+                )
                 t_test_ground_list = torch.cat((t_test_ground_list, y), dim=0)
                 t_test_labels_list = torch.cat((t_test_labels_list, labels), dim=0)
 
@@ -293,14 +300,17 @@ def test(model, dataloader):
     return avg_loss, [test_predicted_list, test_ground_list, test_labels_list]
 
 
-_device = torch.device('cuda:0')
+_device = torch.device("cuda:0")
+
 
 def get_device():
     return _device
 
+
 def set_device(dev):
     global _device
     _device = dev
+
 
 def init_work(worker_id, seed):
     np.random.seed(seed + worker_id)
@@ -309,7 +319,7 @@ def init_work(worker_id, seed):
 def asMinutes(s):
     m = math.floor(s / 60)
     s -= m * 60
-    return '%dm %ds' % (m, s)
+    return "%dm %ds" % (m, s)
 
 
 def timeSincePlus(since, percent):
@@ -317,7 +327,7 @@ def timeSincePlus(since, percent):
     s = now - since
     es = s / (percent)
     rs = es - s
-    return '%s (- %s)' % (asMinutes(s), asMinutes(rs))
+    return "%s (- %s)" % (asMinutes(s), asMinutes(rs))
 
 
 def timeSince(since):
@@ -325,27 +335,41 @@ def timeSince(since):
     s = now - since
     m = math.floor(s / 60)
     s -= m * 60
-    return '%dm %ds' % (m, s)
+    return "%dm %ds" % (m, s)
+
 
 def timestamp2str(sec, fmt, tz):
     return datetime.fromtimestamp(sec).astimezone(tz).strftime(fmt)
 
 
 def loss_func(y_pred, y_true):
-    loss = F.mse_loss(y_pred, y_true, reduction='mean')
+    loss = F.mse_loss(y_pred, y_true, reduction="mean")
 
     return loss
 
 
+def train(
+    model=None,
+    save_path="",
+    config={},
+    train_dataloader=None,
+    val_dataloader=None,
+    feature_map={},
+    test_dataloader=None,
+    test_dataset=None,
+    dataset_name="swat",
+    train_dataset=None,
+    score_save_path="",
+):
 
-def train(model = None, save_path = '', config={},  train_dataloader=None, val_dataloader=None, feature_map={}, test_dataloader=None, test_dataset=None, dataset_name='swat', train_dataset=None, score_save_path=''):
+    seed = config["seed"]
 
-    seed = config['seed']
-
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=config['decay'], betas=(0.9, 0.99))
+    optimizer = torch.optim.Adam(
+        model.parameters(), lr=0.001, weight_decay=config["decay"], betas=(0.9, 0.99)
+    )
 
     now = time.time()
-    
+
     train_loss_list = []
     cmp_loss_list = []
 
@@ -354,15 +378,14 @@ def train(model = None, save_path = '', config={},  train_dataloader=None, val_d
     best_auc_roc = 0
     best_ap = 0
 
-
     acu_loss = 0
-    min_loss = 1e+8
+    min_loss = 1e8
     min_f1 = 0
     min_pre = 0
     best_prec = 0
 
     i = 0
-    epoch = config['epoch']
+    epoch = config["epoch"]
     # early_stop_win = 15
     early_stop_win = 10
 
@@ -381,26 +404,29 @@ def train(model = None, save_path = '', config={},  train_dataloader=None, val_d
         for x, labels, attack_labels, edge_index in dataloader:
             _start = time.time()
 
-            x, labels, edge_index = [item.float().to(device) for item in [x, labels, edge_index]]
+            x, labels, edge_index = [
+                item.float().to(device) for item in [x, labels, edge_index]
+            ]
 
             optimizer.zero_grad()
             _, out, loss = model(x, edge_index, labels)
-            
+
             loss.backward()
             optimizer.step()
 
-            
             train_loss_list.append(loss.item())
             acu_loss += loss.item()
-                
+
             i += 1
 
-
         # each epoch
-        print('epoch ({} / {}) (Loss:{:.8f}, ACU_loss:{:.8f})'.format(
-                        i_epoch, epoch, 
-                        acu_loss/len(dataloader), acu_loss), flush=True
-             , end=' ')
+        print(
+            "epoch ({} / {}) (Loss:{:.8f}, ACU_loss:{:.8f})".format(
+                i_epoch, epoch, acu_loss / len(dataloader), acu_loss
+            ),
+            flush=True,
+            end=" ",
+        )
 
         _, test_result = test(model, test_dataloader)
 
@@ -419,16 +445,19 @@ def train(model = None, save_path = '', config={},  train_dataloader=None, val_d
 
             topk = 1
             total_features = test_scores.shape[0]
-            topk_indices = np.argpartition(test_scores, range(total_features - topk - 1, total_features), axis=0)[
-                           -topk:]
-            total_topk_err_scores = np.sum(np.take_along_axis(test_scores, topk_indices, axis=0), axis=0)
+            topk_indices = np.argpartition(
+                test_scores, range(total_features - topk - 1, total_features), axis=0
+            )[-topk:]
+            total_topk_err_scores = np.sum(
+                np.take_along_axis(test_scores, topk_indices, axis=0), axis=0
+            )
 
             auc_roc = roc_auc_score(test_labels, total_topk_err_scores)
             ap = average_precision_score(test_labels, total_topk_err_scores)
             return auc_roc, ap, total_topk_err_scores
 
         auc_roc, ap, scores = get_score_only_test(test_result)
-        print('auc_roc:', auc_roc, 'auc_pr:', ap)
+        print("auc_roc:", auc_roc, "auc_pr:", ap)
 
         if auc_roc > best_auc_roc:
             best_auc_roc = auc_roc

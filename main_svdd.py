@@ -14,19 +14,26 @@ from general_tools import set_random_seed
 set_random_seed(args.seed)
 
 torch.backends.cudnn.benchmark = False
-os.environ['CUBLAS_WORKSPACE_CONFIG']=':16:8'
+os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":16:8"
 torch.use_deterministic_algorithms(True)
 
 from task.SVDD import switch_config
 from clients.client_mix import test_inference, get_init_grad_correct, generate_clients
 
-if args.dataset == 'smd':
+if args.dataset == "smd":
     from task.smd_MOON import test_dataset
-elif args.dataset == 'smap':
+elif args.dataset == "smap":
     from task.smap_MOON import test_dataset
-elif args.dataset == 'psm':
+elif args.dataset == "psm":
     from task.psm_MOON import test_dataset
-from task.SVDD import config_svdd, Model_first_stage, Model_second_stage, client_datasets, load_model
+from task.SVDD import (
+    config_svdd,
+    Model_first_stage,
+    Model_second_stage,
+    client_datasets,
+    load_model,
+)
+
 
 def average_weights(state_dicts: List[dict], fed_avg_freqs: torch.Tensor):
     # init
@@ -42,9 +49,17 @@ def average_weights(state_dicts: List[dict], fed_avg_freqs: torch.Tensor):
     return avg_state_dict
 
 
-def update_global_grad_correct(old_correct: dict, grad_correct_deltas: List[dict], fed_avg_freqs: torch.Tensor, num_chosen_client, num_total_client):
-    assert (len(grad_correct_deltas) == num_chosen_client)
-    total_delta = average_weights(grad_correct_deltas, [1 / num_chosen_client] * num_chosen_client)
+def update_global_grad_correct(
+    old_correct: dict,
+    grad_correct_deltas: List[dict],
+    fed_avg_freqs: torch.Tensor,
+    num_chosen_client,
+    num_total_client,
+):
+    assert len(grad_correct_deltas) == num_chosen_client
+    total_delta = average_weights(
+        grad_correct_deltas, [1 / num_chosen_client] * num_chosen_client
+    )
     for key in old_correct.keys():
         if key in total_delta.keys():
             old_correct[key] = old_correct[key] + total_delta[key]
@@ -65,15 +80,16 @@ def train_stage_1(clients):
     global_state_dict = model.state_dict()
     global_correct = get_init_grad_correct(Model_first_stage().cpu())
 
-
     # Training
     best_auc_roc = 0
     for global_round in tqdm(range(config_svdd["epochs"]), file=sys.stdout):
-        logger.print(f'\n | Global Training Round : {global_round + 1} |\n')
+        logger.print(f"\n | Global Training Round : {global_round + 1} |\n")
 
         num_active_client = int((len(clients) * args.client_rate))
-        
-        ind_active_clients = np.random.choice(range(len(clients)), num_active_client, replace=False)
+
+        ind_active_clients = np.random.choice(
+            range(len(clients)), num_active_client, replace=False
+        )
         active_clients = [clients[i] for i in ind_active_clients]
         # endregion
 
@@ -85,9 +101,9 @@ def train_stage_1(clients):
         for client in active_clients:
             data_nums.append(len(client.dataset))
             loss, accuracy, grad_correct_delta = client.local_train(
-                    global_state_dict,
-                    global_round,
-                    global_correct,
+                global_state_dict,
+                global_round,
+                global_correct,
             )
             grad_correct_deltas.append(grad_correct_delta)
             #
@@ -98,10 +114,13 @@ def train_stage_1(clients):
 
         fed_freq = torch.tensor(data_nums, dtype=torch.float) / sum(data_nums)
         global_state_dict = average_weights(active_state_dict, fed_freq)
-        if args.alg == 'scaffold':
+        if args.alg == "scaffold":
             global_correct = update_global_grad_correct(
-                    global_correct, grad_correct_deltas,
-                    fed_freq, num_active_client, len(clients)
+                global_correct,
+                grad_correct_deltas,
+                fed_freq,
+                num_active_client,
+                len(clients),
             )
         # endregion
 
@@ -111,8 +130,22 @@ def train_stage_1(clients):
 
 def train_stage_2(clients, model_stage_1):
 
-    model_save_path = os.path.abspath(os.getcwd()) + '/fltsad/pths/' + args.alg + '_deepsvdd_stage_2_' + args.dataset + '_new.pth'
-    score_save_path = os.path.abspath(os.getcwd()) + '/fltsad/scores/' + args.alg + '_deepsvdd_' + args.dataset + '_new.npy'
+    model_save_path = (
+        os.path.abspath(os.getcwd())
+        + "/fltsad/pths/"
+        + args.alg
+        + "_deepsvdd_stage_2_"
+        + args.dataset
+        + "_new.pth"
+    )
+    score_save_path = (
+        os.path.abspath(os.getcwd())
+        + "/fltsad/scores/"
+        + args.alg
+        + "_deepsvdd_"
+        + args.dataset
+        + "_new.npy"
+    )
 
     model = Model_second_stage().cpu()
 
@@ -134,12 +167,13 @@ def train_stage_2(clients, model_stage_1):
 
     # Training
     for global_round in tqdm(range(config_svdd["epochs"]), file=sys.stdout):
-        logger.print(f'\n | Global Training Round : {global_round + 1} |\n')
-
+        logger.print(f"\n | Global Training Round : {global_round + 1} |\n")
 
         num_active_client = int((len(clients) * args.client_rate))
 
-        ind_active_clients = np.random.choice(range(len(clients)), num_active_client, replace=False)
+        ind_active_clients = np.random.choice(
+            range(len(clients)), num_active_client, replace=False
+        )
         active_clients = [clients[i] for i in ind_active_clients]
         # endregion
 
@@ -151,20 +185,17 @@ def train_stage_2(clients, model_stage_1):
         grad_correct_deltas = []
         for client in active_clients:
             data_nums.append(len(client.dataset))
-            if args.dataset == 'smd':
+            if args.dataset == "smd":
                 model_fun = lambda: SMD_MLP()
-            elif args.dataset == 'smap':
+            elif args.dataset == "smap":
                 model_fun = lambda: SMAP_MLP()
-            elif args.dataset == 'psm':
+            elif args.dataset == "psm":
                 model_fun = lambda: PSM_MLP()
             client.grad_correct = get_init_grad_correct(model_fun())
             if global_round == 0:
                 client.global_state_dict = None
             loss, accuracy, grad_correct_delta, client_c = client.local_train(
-                    global_state_dict,
-                    global_round,
-                    global_correct,
-                    global_c
+                global_state_dict, global_round, global_correct, global_c
             )
             grad_correct_deltas.append(grad_correct_delta)
             #
@@ -174,14 +205,16 @@ def train_stage_2(clients, model_stage_1):
             cs.append(client_c.detach().cpu().numpy())
         # endregion
 
-
         # region 平均权重 更新global 模型
         fed_freq = torch.tensor(data_nums, dtype=torch.float) / sum(data_nums)
         global_state_dict = average_weights(active_state_dict, fed_freq)
-        if args.alg == 'scaffold':
+        if args.alg == "scaffold":
             global_correct = update_global_grad_correct(
-                    global_correct, grad_correct_deltas,
-                    fed_freq, num_active_client, len(clients)
+                global_correct,
+                grad_correct_deltas,
+                fed_freq,
+                num_active_client,
+                len(clients),
             )
         # endregion
 
@@ -189,15 +222,12 @@ def train_stage_2(clients, model_stage_1):
         cs_now = torch.tensor(np.asarray(cs))
         mdl.c = torch.mean(cs_now, dim=0)
         if (global_round + 1) % args.save_every == 0:
-            auc_roc, ap, test_loss, scores = test_inference(
-                    mdl,
-                    test_dataset
-            )
+            auc_roc, ap, test_loss, scores = test_inference(mdl, test_dataset)
             logger.add_record("test_auc_roc", auc_roc, global_round + 1)
             if test_loss is not None:
                 logger.add_record("test_ap", ap, global_round + 1)
             logger.add_record("test_loss", test_loss, global_round + 1)
-            logger.print(f' \n Last Results:')
+            logger.print(f" \n Last Results:")
             # logger.print(f"Test Accuracy (full sample rate): {100 * test_acc:.2f}%")
             print(f"Test AUC-ROC: {auc_roc}")
             print(f"Test AP: {ap}")
@@ -212,7 +242,7 @@ def train_stage_2(clients, model_stage_1):
 
         # endregion
 
-    logger.print(f' \n Last Results:')
+    logger.print(f" \n Last Results:")
 
     print(f"Test AUC-ROC: {best_auc_roc}")
     print(f"Test AP: {best_ap}")
@@ -220,7 +250,7 @@ def train_stage_2(clients, model_stage_1):
         print(f"Test loss (full sample rate): {test_loss:.2f}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     set_random_seed(args.seed)
     os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
     torch.cuda.set_device(args.device)

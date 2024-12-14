@@ -36,7 +36,7 @@ def eval_scores(scores, true_scores, th_steps, return_thresold=False):
     if len(padding_list) > 0:
         scores = padding_list + scores
 
-    scores_sorted = rankdata(scores, method='ordinal')
+    scores_sorted = rankdata(scores, method="ordinal")
     th_steps = th_steps
     # th_steps = 500
     th_vals = np.array(range(th_steps)) * 1.0 / th_steps
@@ -79,7 +79,9 @@ def get_err_median_and_quantile(predicted, groundtruth, percentage):
 
     err_median = np.median(np_arr)
     # err_iqr = iqr(np_arr)
-    err_delta = percentile(np_arr, int(percentage * 100)) - percentile(np_arr, int((1 - percentage) * 100))
+    err_delta = percentile(np_arr, int(percentage * 100)) - percentile(
+        np_arr, int((1 - percentage) * 100)
+    )
 
     return err_median, err_delta
 
@@ -89,7 +91,9 @@ def get_err_mean_and_quantile(predicted, groundtruth, percentage):
 
     err_median = trim_mean(np_arr, percentage)
     # err_iqr = iqr(np_arr)
-    err_delta = percentile(np_arr, int(percentage * 100)) - percentile(np_arr, int((1 - percentage) * 100))
+    err_delta = percentile(np_arr, int(percentage * 100)) - percentile(
+        np_arr, int((1 - percentage) * 100)
+    )
 
     return err_median, err_delta
 
@@ -111,7 +115,7 @@ def get_f1_score(scores, gt, contamination):
     if len(padding_list) > 0:
         scores = padding_list + scores
 
-    pred_labels = (scores > threshold).astype('int').ravel()
+    pred_labels = (scores > threshold).astype("int").ravel()
 
     return f1_score(gt, pred_labels)
 
@@ -120,15 +124,15 @@ def get_full_err_scores(test_result, val_result):
     np_test_result = np.array(test_result)
     np_val_result = np.array(val_result)
 
-    all_scores =  None
+    all_scores = None
     all_normals = None
     feature_num = np_test_result.shape[-1]
 
     labels = np_test_result[2, :, 0].tolist()
 
     for i in range(feature_num):
-        test_re_list = np_test_result[:2,:,i]
-        val_re_list = np_val_result[:2,:,i]
+        test_re_list = np_test_result[:2, :, i]
+        val_re_list = np_val_result[:2, :, i]
 
         scores = get_err_scores(test_re_list, val_re_list)
         normal_dist = get_err_scores(val_re_list, val_re_list)
@@ -137,48 +141,41 @@ def get_full_err_scores(test_result, val_result):
             all_scores = scores
             all_normals = normal_dist
         else:
-            all_scores = np.vstack((
-                all_scores,
-                scores
-            ))
-            all_normals = np.vstack((
-                all_normals,
-                normal_dist
-            ))
+            all_scores = np.vstack((all_scores, scores))
+            all_normals = np.vstack((all_normals, normal_dist))
 
     return all_scores, all_normals
+
 
 def get_full_err_scores_only_test(test_result):
     np_test_result = np.array(test_result)
 
-    all_scores =  None
+    all_scores = None
     feature_num = np_test_result.shape[-1]
 
     labels = np_test_result[2, :, 0].tolist()
 
     for i in range(feature_num):
-        test_re_list = np_test_result[:2,:,i]
+        test_re_list = np_test_result[:2, :, i]
 
         scores = get_err_scores_only_test(test_re_list)
 
         if all_scores is None:
             all_scores = scores
         else:
-            all_scores = np.vstack((
-                all_scores,
-                scores
-            ))
+            all_scores = np.vstack((all_scores, scores))
 
     return all_scores
 
 
 def get_final_err_scores(test_result, val_result):
-    full_scores, all_normals = get_full_err_scores(test_result, val_result, return_normal_scores=True)
+    full_scores, all_normals = get_full_err_scores(
+        test_result, val_result, return_normal_scores=True
+    )
 
     all_scores = np.max(full_scores, axis=0)
 
     return all_scores
-
 
 
 def get_err_scores(test_res, val_res):
@@ -187,20 +184,21 @@ def get_err_scores(test_res, val_res):
 
     n_err_mid, n_err_iqr = get_err_median_and_iqr(test_predict, test_gt)
 
-    test_delta = np.abs(np.subtract(
-                        np.array(test_predict).astype(np.float64), 
-                        np.array(test_gt).astype(np.float64)
-                    ))
-    epsilon=1e-2
+    test_delta = np.abs(
+        np.subtract(
+            np.array(test_predict).astype(np.float64),
+            np.array(test_gt).astype(np.float64),
+        )
+    )
+    epsilon = 1e-2
 
-    err_scores = (test_delta - n_err_mid) / ( np.abs(n_err_iqr) +epsilon)
+    err_scores = (test_delta - n_err_mid) / (np.abs(n_err_iqr) + epsilon)
 
     smoothed_err_scores = np.zeros(err_scores.shape)
     before_num = 3
     for i in range(before_num, len(err_scores)):
-        smoothed_err_scores[i] = np.mean(err_scores[i-before_num:i+1])
+        smoothed_err_scores[i] = np.mean(err_scores[i - before_num : i + 1])
 
-    
     return smoothed_err_scores
 
 
@@ -209,10 +207,12 @@ def get_err_scores_only_test(test_res):
 
     n_err_mid, n_err_iqr = get_err_median_and_iqr(test_predict, test_gt)
 
-    test_delta = np.abs(np.subtract(
-        np.array(test_predict).astype(np.float64),
-        np.array(test_gt).astype(np.float64)
-    ))
+    test_delta = np.abs(
+        np.subtract(
+            np.array(test_predict).astype(np.float64),
+            np.array(test_gt).astype(np.float64),
+        )
+    )
     epsilon = 1e-2
 
     err_scores = (test_delta - n_err_mid) / (np.abs(n_err_iqr) + epsilon)
@@ -220,30 +220,39 @@ def get_err_scores_only_test(test_res):
     smoothed_err_scores = np.zeros(err_scores.shape)
     before_num = 3
     for i in range(before_num, len(err_scores)):
-        smoothed_err_scores[i] = np.mean(err_scores[i - before_num:i + 1])
+        smoothed_err_scores[i] = np.mean(err_scores[i - before_num : i + 1])
 
     return smoothed_err_scores
+
 
 def get_loss(predict, gt):
     return eval_mseloss(predict, gt)
 
+
 def get_f1_scores(total_err_scores, gt_labels, topk=1):
-    print('total_err_scores', total_err_scores.shape)
+    print("total_err_scores", total_err_scores.shape)
     # remove the highest and lowest score at each timestep
     total_features = total_err_scores.shape[0]
 
     # topk_indices = np.argpartition(total_err_scores, range(total_features-1-topk, total_features-1), axis=0)[-topk-1:-1]
-    topk_indices = np.argpartition(total_err_scores, range(total_features-topk-1, total_features), axis=0)[-topk:]
-    
+    topk_indices = np.argpartition(
+        total_err_scores, range(total_features - topk - 1, total_features), axis=0
+    )[-topk:]
+
     topk_indices = np.transpose(topk_indices)
 
     total_topk_err_scores = []
-    topk_err_score_map=[]
+    topk_err_score_map = []
     # topk_anomaly_sensors = []
 
     for i, indexs in enumerate(topk_indices):
-       
-        sum_score = sum( score for k, score in enumerate(sorted([total_err_scores[index, i] for j, index in enumerate(indexs)])) )
+
+        sum_score = sum(
+            score
+            for k, score in enumerate(
+                sorted([total_err_scores[index, i] for j, index in enumerate(indexs)])
+            )
+        )
 
         total_topk_err_scores.append(sum_score)
 
@@ -251,15 +260,20 @@ def get_f1_scores(total_err_scores, gt_labels, topk=1):
 
     return final_topk_fmeas
 
+
 def get_val_performance_data(total_err_scores, normal_scores, gt_labels, topk=1):
     total_features = total_err_scores.shape[0]
 
-    topk_indices = np.argpartition(total_err_scores, range(total_features-topk-1, total_features), axis=0)[-topk:]
+    topk_indices = np.argpartition(
+        total_err_scores, range(total_features - topk - 1, total_features), axis=0
+    )[-topk:]
 
     total_topk_err_scores = []
-    topk_err_score_map=[]
+    topk_err_score_map = []
 
-    total_topk_err_scores = np.sum(np.take_along_axis(total_err_scores, topk_indices, axis=0), axis=0)
+    total_topk_err_scores = np.sum(
+        np.take_along_axis(total_err_scores, topk_indices, axis=0), axis=0
+    )
 
     thresold = np.max(normal_scores)
 
@@ -275,7 +289,6 @@ def get_val_performance_data(total_err_scores, normal_scores, gt_labels, topk=1)
 
     f1 = f1_score(gt_labels, pred_labels)
 
-
     auc_score = roc_auc_score(gt_labels, total_topk_err_scores)
 
     return f1, pre, rec, auc_score, thresold
@@ -286,14 +299,20 @@ def get_best_performance_data(total_err_scores, gt_labels, topk=1):
     total_features = total_err_scores.shape[0]
 
     # topk_indices = np.argpartition(total_err_scores, range(total_features-1-topk, total_features-1), axis=0)[-topk-1:-1]
-    topk_indices = np.argpartition(total_err_scores, range(total_features-topk-1, total_features), axis=0)[-topk:]
+    topk_indices = np.argpartition(
+        total_err_scores, range(total_features - topk - 1, total_features), axis=0
+    )[-topk:]
 
     total_topk_err_scores = []
-    topk_err_score_map=[]
+    topk_err_score_map = []
 
-    total_topk_err_scores = np.sum(np.take_along_axis(total_err_scores, topk_indices, axis=0), axis=0)
+    total_topk_err_scores = np.sum(
+        np.take_along_axis(total_err_scores, topk_indices, axis=0), axis=0
+    )
 
-    final_topk_fmeas ,thresolds = eval_scores(total_topk_err_scores, gt_labels, 400, return_thresold=True)
+    final_topk_fmeas, thresolds = eval_scores(
+        total_topk_err_scores, gt_labels, 400, return_thresold=True
+    )
 
     th_i = final_topk_fmeas.index(max(final_topk_fmeas))
     thresold = thresolds[th_i]
@@ -314,14 +333,12 @@ def get_best_performance_data(total_err_scores, gt_labels, topk=1):
         elif gt_labels[i] == 0 and len(anomaly_starts) != len(anomaly_ends):
             anomaly_ends.append(i)
     for i in range(len(anomaly_starts)):
-        if sum(pred_labels[anomaly_starts[i]: anomaly_ends[i]]) > 0:
-            pred_labels[anomaly_starts[i]: anomaly_ends[i]] = 1
+        if sum(pred_labels[anomaly_starts[i] : anomaly_ends[i]]) > 0:
+            pred_labels[anomaly_starts[i] : anomaly_ends[i]] = 1
 
     pre = precision_score(gt_labels, pred_labels)
     rec = recall_score(gt_labels, pred_labels)
 
-
     auc_score = roc_auc_score(gt_labels, total_topk_err_scores)
 
     return max(final_topk_fmeas), pre, rec, auc_score, thresold
-

@@ -27,5 +27,5 @@ def uniformly_split_list(l: list, num_sublist) -> List[list]:
         shard_intervals.append(len(l))
     sublists = []
     for i in range(len(shard_intervals) - 1):
-        sublists.append(l[shard_intervals[i]:shard_intervals[i + 1]])
+        sublists.append(l[shard_intervals[i] : shard_intervals[i + 1]])
     return sublists

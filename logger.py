@@ -20,13 +20,7 @@ class MyLogger:
         self.save_dir = save_dir
         if not os.path.exists(self.save_dir):
             os.makedirs(self.save_dir)
-        self.record = {
-            "data": {},
-            "step": {},
-            "info": {},
-            "args": {},
-            "output": ""
-        }
+        self.record = {"data": {}, "step": {}, "info": {}, "args": {}, "output": ""}
         #
         self.start_time = time.time()
         #

@@ -12,14 +12,16 @@ class PositionalEncoding(nn.Module):
 
         pe = torch.zeros(max_len, d_model)
         position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0, d_model).float() * (-math.log(10000.0) / d_model))
+        div_term = torch.exp(
+            torch.arange(0, d_model).float() * (-math.log(10000.0) / d_model)
+        )
         pe += torch.sin(position * div_term)
         pe += torch.cos(position * div_term)
         pe = pe.unsqueeze(0).transpose(0, 1)
-        self.register_buffer('pe', pe)
+        self.register_buffer("pe", pe)
 
     def forward(self, x, pos=0):
-        x = x + self.pe[pos:pos+x.size(0), :]
+        x = x + self.pe[pos : pos + x.size(0), :]
         return self.dropout(x)
 
 
@@ -37,7 +39,15 @@ class TransformerDecoderLayer(nn.Module):
 
         self.activation = nn.LeakyReLU(True)
 
-    def forward(self, tgt, memory, tgt_mask=None, memory_mask=None, tgt_key_padding_mask=None, memory_key_padding_mask=None):
+    def forward(
+        self,
+        tgt,
+        memory,
+        tgt_mask=None,
+        memory_mask=None,
+        tgt_key_padding_mask=None,
+        memory_key_padding_mask=None,
+    ):
         tgt2 = self.self_attn(tgt, tgt, tgt)[0]
         tgt = tgt + self.dropout1(tgt2)
         tgt2 = self.multihead_attn(tgt, memory, memory)[0]
@@ -59,7 +69,7 @@ class TransformerEncoderLayer(nn.Module):
 
         self.activation = nn.LeakyReLU(True)
 
-    def forward(self, src,src_mask=None, src_key_padding_mask=None):
+    def forward(self, src, src_mask=None, src_key_padding_mask=None):
         src2 = self.self_attn(src, src, src)[0]
         src = src + self.dropout1(src2)
         src2 = self.linear2(self.dropout(self.activation(self.linear1(src))))
@@ -71,18 +81,24 @@ class TransformerEncoderLayer(nn.Module):
 class TranAD(nn.Module):
     def __init__(self, feats):
         super(TranAD, self).__init__()
-        self.name = 'TranAD'
+        self.name = "TranAD"
         self.lr = 0.001
         self.batch = 128
         self.n_feats = feats
         self.n_window = 10
         self.n = self.n_feats * self.n_window
         self.pos_encoder = PositionalEncoding(2 * feats, 0.1, self.n_window)
-        encoder_layers = TransformerEncoderLayer(d_model=2 * feats, nhead=feats, dim_feedforward=16, dropout=0.1)
+        encoder_layers = TransformerEncoderLayer(
+            d_model=2 * feats, nhead=feats, dim_feedforward=16, dropout=0.1
+        )
         self.transformer_encoder = TransformerEncoder(encoder_layers, 1)
-        decoder_layers1 = TransformerDecoderLayer(d_model=2 * feats, nhead=feats, dim_feedforward=16, dropout=0.1)
+        decoder_layers1 = TransformerDecoderLayer(
+            d_model=2 * feats, nhead=feats, dim_feedforward=16, dropout=0.1
+        )
         self.transformer_decoder1 = TransformerDecoder(decoder_layers1, 1)
-        decoder_layers2 = TransformerDecoderLayer(d_model=2 * feats, nhead=feats, dim_feedforward=16, dropout=0.1)
+        decoder_layers2 = TransformerDecoderLayer(
+            d_model=2 * feats, nhead=feats, dim_feedforward=16, dropout=0.1
+        )
         self.transformer_decoder2 = TransformerDecoder(decoder_layers2, 1)
         self.fcn = nn.Sequential(nn.Linear(2 * feats, feats), nn.Sigmoid())
 
@@ -109,5 +125,5 @@ class TranAD(nn.Module):
         # print(x2.shape, tgt.shape, src.shape)
         logits = (x2[0, :, :] - tgt[0, :, :]) ** 2
         # print(logits.shape)
-        others = {'x1': x1, 'x2': x2}
+        others = {"x1": x1, "x2": x2}
         return features, logits, others
