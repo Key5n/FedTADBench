@@ -2,23 +2,18 @@ import os
 import sys
 import time
 
-
 sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "../..")))
-
 
 from convert_time import convert_time
 
 import numpy as np
 import torch
-from sklearn.metrics import roc_auc_score, average_precision_score
 from torch import nn
 from torch.utils.data import DataLoader
 
 from algorithms.LSTM_AE.LSTMAE import LSTMAE
 from algorithms.read_datasets import SMD_Dataset, SMAP_Dataset, PSM_Dataset
-
-import random
-import os
+from evaluation.metrics import get_metrics
 
 dataset_dims_dict = {"smd": 38, "smap": 25, "psm": 25}
 
@@ -95,6 +90,9 @@ def lstmae_exp(args=None):
 
     best_auc_roc = 0
     best_ap = 0
+    best_vus_roc = 0
+    best_vus_pr = 0
+    best_pate = 0
 
     time_start = time.time()
 
@@ -134,13 +132,33 @@ def lstmae_exp(args=None):
             scores = np.squeeze(scores, axis=1)
         if len(ys.shape) == 2:
             ys = np.squeeze(ys, axis=1)
-        auc_roc = roc_auc_score(ys, scores)
-        ap = average_precision_score(ys, scores)
-        print("auc-roc: " + str(auc_roc) + " auc_pr: " + str(ap), end="")
+        evaluation_result = get_metrics(scores, ys)
+        auc_roc = evaluation_result["AUC-ROC"]
+        ap = evaluation_result["AUC-PR"]
+        vus_roc = evaluation_result["VUS-ROC"]
+        vus_pr = evaluation_result["VUS-PR"]
+        pate = evaluation_result["PATE"]
 
-        if auc_roc > best_auc_roc:
+        print(
+            "auc-roc: "
+            + str(auc_roc)
+            + " auc_pr: "
+            + str(ap)
+            + " vus_roc: "
+            + str(vus_roc)
+            + " vus_pr: "
+            + str(vus_pr)
+            + " pate: "
+            + str(pate),
+            end="",
+        )
+
+        if pate > best_pate:
             best_auc_roc = auc_roc
             best_ap = ap
+            best_vus_roc = vus_roc
+            best_vus_pr = vus_pr
+            best_pate = pate
             torch.save(model.state_dict(), model_save_path)
             np.save(score_save_path, scores)
             print(" update")
@@ -151,6 +169,9 @@ def lstmae_exp(args=None):
 
     print("Best auc_roc:", best_auc_roc)
     print("Best ap:", best_ap)
+    print("Best vus_roc:", best_vus_roc)
+    print("Best vus_pr:", best_vus_pr)
+    print("Best pate:", best_pate)
     print("Total time:", convert_time(time_end - time_start))
 
     # 测试
