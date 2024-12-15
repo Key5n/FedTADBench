@@ -10,6 +10,8 @@ import random
 
 import sys
 
+from evaluation.metrics import get_metrics
+
 
 sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "../..")))
 
@@ -79,6 +81,9 @@ def tranad_main(args=None):
     l = nn.MSELoss(reduction="none")
     best_auc_roc = 0
     best_ap = 0
+    best_vus_roc = 0
+    best_vus_pr = 0
+    best_pate = 0
     model_save_path = (
         os.path.abspath(os.path.join(os.getcwd(), "../.."))
         + "/fltsad/pths/tranad_"
@@ -136,13 +141,36 @@ def tranad_main(args=None):
         test_losses = np.mean(test_losses, axis=1)
 
         labels = testloader.dataset.target
-        auc_roc = roc_auc_score(labels, test_losses)
-        ap = average_precision_score(labels, test_losses)
-        print(" auc_roc:", auc_roc, "auc_pr:", ap)
 
-        if auc_roc > best_auc_roc:
+        evaluation_result = get_metrics(test_losses, labels)
+        auc_roc = evaluation_result["AUC-ROC"]
+        ap = evaluation_result["AUC-PR"]
+        vus_roc = evaluation_result["VUS-ROC"]
+        vus_pr = evaluation_result["VUS-PR"]
+        pate = evaluation_result["PATE"]
+        print(
+            "epoch",
+            epoch,
+            "auc_roc:",
+            auc_roc,
+            "auc_pr:",
+            ap,
+            "vus_roc:",
+            vus_roc,
+            "vus_pr:",
+            vus_pr,
+            "pate:",
+            pate,
+            "time:",
+            str(convert_time(time_end - time_start)),
+        )
+
+        if pate > best_pate:
             best_auc_roc = auc_roc
             best_ap = ap
+            best_vus_roc = vus_roc
+            best_vus_pr = vus_pr
+            best_pate = pate
             torch.save(model.state_dict(), model_save_path)
             np.save(score_save_path, test_losses)
 
@@ -150,6 +178,9 @@ def tranad_main(args=None):
 
     print("Best auc_roc:", best_auc_roc)
     print("Best ap:", best_ap)
+    print("Best vus_roc:", best_vus_roc)
+    print("Best vus_pr:", best_vus_pr)
+    print("Best pate:", best_pate)
     print("Total time:", convert_time(time_end - time_start))
 
 
