@@ -11,6 +11,8 @@ import torch.nn.functional as F
 import logging
 import numpy as np
 
+from evaluation.metrics import get_metrics
+
 
 class BaseADDataset(ABC):
     """Anomaly detection dataset base class."""
@@ -557,6 +559,9 @@ class DeepSVDDTrainer(BaseTrainer):
 
         best_auc_roc = 0
         best_ap = 0
+        best_vus_roc = 0
+        best_vus_pr = 0
+        best_pate = 0
 
         logger = logging.getLogger()
 
@@ -646,12 +651,16 @@ class DeepSVDDTrainer(BaseTrainer):
 
             net.eval()
             print("epoch", epoch + 1, end=" ")
-            auc_roc, ap, scores = self.test(test_data, net, score_save_path)
+            auc_roc, ap, vus_roc, vus_pr, pate, scores = self.test(
+                test_data, net, score_save_path
+            )
 
-            if auc_roc > best_auc_roc:
-
+            if pate > best_pate:
                 best_auc_roc = auc_roc
                 best_ap = ap
+                best_vus_roc = vus_roc
+                best_vus_pr = vus_pr
+                best_pate = pate
                 torch.save(net.state_dict(), model_save_path)
                 np.save(score_save_path, scores)
 
@@ -665,7 +674,7 @@ class DeepSVDDTrainer(BaseTrainer):
 
         logger.info("Finished training.")
 
-        return net, best_auc_roc, best_ap
+        return net, best_auc_roc, best_ap, best_vus_roc, best_vus_pr, best_pate
 
     def test(self, dataset, net: BaseNet, score_save_path):
         logger = logging.getLogger()
@@ -725,16 +734,45 @@ class DeepSVDDTrainer(BaseTrainer):
         labels = np.array(labels)
         scores = np.array(scores)
 
-        self.test_auc = roc_auc_score(labels, scores)
-        self.test_ap = average_precision_score(labels, scores)
+        evaluation_result = get_metrics(scores, labels)
+        auc_roc = evaluation_result["AUC-ROC"]
+        ap = evaluation_result["AUC-PR"]
+        vus_roc = evaluation_result["VUS-ROC"]
+        vus_pr = evaluation_result["VUS-PR"]
+        pate = evaluation_result["PATE"]
+
+        self.test_auc = auc_roc
+        self.test_ap = ap
+        self.test_vus_roc = vus_roc
+        self.test_vus_pr = vus_pr
+        self.test_pate = pate
+
         logger.info("Test set AUC: {:.2f}%".format(100.0 * self.test_auc))
         logger.info("Test set AP: {:.2f}%".format(100.0 * self.test_ap))
-        print("auc_roc:", self.test_auc, "auc_pr:", self.test_ap)
+        print(
+            "auc_roc:",
+            auc_roc,
+            "auc_pr:",
+            ap,
+            "vus_roc:",
+            vus_roc,
+            "vus_pr:",
+            vus_pr,
+            "pate:",
+            pate,
+        )
 
         logger.info("Finished testing.")
 
         # np.save(score_save_path, scores)
-        return self.test_auc, self.test_ap, scores
+        return (
+            self.test_auc,
+            self.test_ap,
+            self.test_vus_roc,
+            self.test_vus_pr,
+            self.test_pate,
+            scores,
+        )
 
     def init_center_c(self, train_loader: DataLoader, net: BaseNet, eps=0.1):
         """Initialize hypersphere center c as the mean from an initial forward pass on the data."""
@@ -849,18 +887,20 @@ class DeepSVDD(object):
             n_jobs_dataloader=n_jobs_dataloader,
         )
         # Get the model
-        self.net, best_auc_roc, best_ap = self.trainer.train(
-            train_data,
-            self.net,
-            model_save_path,
-            test_data,
-            score_save_path,
-            rc_save_path,
+        self.net, best_auc_roc, best_ap, best_vus_roc, best_vus_pr, best_pate = (
+            self.trainer.train(
+                train_data,
+                self.net,
+                model_save_path,
+                test_data,
+                score_save_path,
+                rc_save_path,
+            )
         )
         self.R = float(self.trainer.R.cpu().data.numpy())  # get float
         self.c = self.trainer.c.cpu().data.numpy().tolist()  # get list
         self.results["train_time"] = self.trainer.train_time
-        return best_auc_roc, best_ap
+        return best_auc_roc, best_ap, best_vus_roc, best_vus_pr, best_pate
 
     def test(
         self,

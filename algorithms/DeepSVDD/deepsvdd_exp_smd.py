@@ -243,7 +243,7 @@ def main(
     logger.info("Training weight decay: %g" % cfg.settings["weight_decay"])
 
     # Train model on dataset
-    best_auc_roc, best_ap = deep_SVDD.train(
+    best_auc_roc, best_ap, best_vus_roc, best_vus_pr, best_pate = deep_SVDD.train(
         train_data,
         optimizer_name=cfg.settings["optimizer_name"],
         lr=cfg.settings["lr"],
@@ -263,6 +263,9 @@ def main(
 
     print("Best auc_roc:", best_auc_roc)
     print("Best ap:", best_ap)
+    print("Best vus_roc:", best_vus_roc)
+    print("Best vus_pr:", best_vus_pr)
+    print("Best pate:", best_pate)
     print("Total time:", convert_time(time_end - time_start))
 
 
