@@ -202,7 +202,7 @@ def get_feature_map(dataset):
     else:
         if dataset == "smd":
             feature_file = open(
-                os.path.abspath(os.getcwd()) + "/data/datasets/smd/SMD/raw/list.txt",
+                os.path.abspath(os.path.dirname(os.path.dirname(os.getcwd()))) + "/data/datasets/smd/SMD/raw/list.txt",
                 "r",
             )
         elif dataset == "smap":
@@ -244,7 +244,8 @@ def get_fc_graph_struc(dataset):
     else:
         if dataset == "smd":
             feature_file = open(
-                os.path.abspath(os.getcwd()) + "/data/datasets/smd/SMD/raw/list.txt",
+                os.path.abspath(os.path.dirname(os.path.dirname(os.getcwd())))
+                + "/data/datasets/smd/SMD/raw/list.txt",
                 "r",
             )
         elif dataset == "smap":
