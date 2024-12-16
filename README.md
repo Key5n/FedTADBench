@@ -1,3 +1,11 @@
+# To run GDN
+
+1. Update pip's version to latest (9.0 doesn't work)
+2. Run `pip install -r `requirements-gdn.txt`
+3. Run `pip install https://data.pyg.org/whl/torch-1.5.0/torch_scatter-2.0.5%2Bcu102-cp37-cp37m-linux_x86_64.whl` and `pip3 install https://data.pyg.org/whl/torch-1.5.0/torch_sparse-0.6.4%2Bcu102-cp37-cp37m-linux_x86_64.whl`
+
+--
+
 # Code for the HPCC-2022 paper "FedTADBench: Federated Time-series Anomaly Detection Benchmark"
 
 Note: All the command in the code blocks are based on the root directory of this repository.
