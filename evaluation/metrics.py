@@ -1,9 +1,13 @@
+import numpy as np
 from pate.PATE_metric import PATE
 from .basic_metrics import basic_metricor, generate_curve
 
 
 def get_metrics(score, labels, slidingWindow=100, pred=None, version="opt", thre=250):
     metrics = {}
+
+    if len(labels.shape) != 1:
+        labels = np.squeeze(labels)
 
     """
     Threshold Independent
