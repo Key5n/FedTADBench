@@ -7,13 +7,12 @@ from torch.utils.data import DataLoader
 
 import sys
 
-from evaluation.metrics import get_metrics
-
 
 sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "../..")))
 from convert_time import convert_time
 
 from algorithms.USAD.USAD import *
+from evaluation.metrics import get_metrics
 
 import matplotlib.pyplot as plt
 import seaborn as sns

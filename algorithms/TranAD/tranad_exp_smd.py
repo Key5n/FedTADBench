@@ -10,9 +10,6 @@ import random
 
 import sys
 
-from evaluation.metrics import get_metrics
-
-
 sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "../..")))
 
 
@@ -20,6 +17,7 @@ from convert_time import convert_time
 
 from algorithms.TranAD.TranAD import TranAD
 from algorithms.read_datasets import SMD_Dataset, SMAP_Dataset, PSM_Dataset
+from evaluation.metrics import get_metrics
 
 
 def tranad_main(args=None):
