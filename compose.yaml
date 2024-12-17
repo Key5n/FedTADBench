@@ -1,0 +1,15 @@
+services:
+  fedtadbench:
+    build: .
+    image: fedtadbench-image
+    container_name: fedtadbench
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: cdi
+              capabilities: ["gpu"]
+              device_ids:
+                - nvidia.com/gpu=all
+    volumes:
+      - .:/workspace
