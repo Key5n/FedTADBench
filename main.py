@@ -70,6 +70,9 @@ def fed_main():
 
     best_auc_roc = 0
     best_ap = 0
+    best_vus_roc = 0
+    best_vus_pr = 0
+    best_pate = 0
     print(os.getcwd())
     model_save_path = (
         os.path.abspath(os.getcwd())
@@ -147,11 +150,14 @@ def fed_main():
         logger.add_record("train_loss", float(mean(train_losses)), global_round)
         if (global_round + 1) % args.save_every == 0:
 
-            auc_roc, ap, test_loss, scores = test_inference(
+            auc_roc, ap, vus_roc, vus_pr, pate, test_loss, scores = test_inference(
                 load_model(global_state_dict).to(args.device), test_dataset
             )
             logger.add_record("test_auc_roc", auc_roc, global_round + 1)
             logger.add_record("test_ap", ap, global_round + 1)
+            logger.add_record("test_vus_roc", vus_roc, global_round + 1)
+            logger.add_record("test_vus_pr", vus_pr, global_round + 1)
+            logger.add_record("test_pate", pate, global_round + 1)
             logger.add_record("test_loss", test_loss, global_round + 1)
             logger.print(
                 f" \n Results after {global_round + 1} global rounds of training:"
@@ -159,10 +165,16 @@ def fed_main():
             print("average time:", mean(times))
             print(f"Test AUC-ROC: {auc_roc}")
             print(f"Test AP: {ap}")
+            print(f"Test VUS-ROC: {vus_roc}")
+            print(f"Test VUS-PR: {vus_pr}")
+            print(f"Test PATE: {pate}")
 
-            if auc_roc > best_auc_roc:
+            if pate > best_pate:
                 best_auc_roc = auc_roc
                 best_ap = ap
+                best_vus_pr = vus_pr
+                best_vus_roc = vus_roc
+                best_pate = pate
                 torch.save(global_state_dict, model_save_path)
                 np.save(score_save_path, scores)
             try:
@@ -177,6 +189,9 @@ def fed_main():
 
     print(f"Test AUC-ROC: {best_auc_roc}")
     print(f"Test AP: {best_ap}")
+    print(f"Test VUS_ROC: {best_vus_roc}")
+    print(f"Test VUS_PR: {best_vus_pr}")
+    print(f"Test PATE: {best_pate}")
     try:
         print(f"Test loss (full sample rate): {test_loss:.2f}")
     except:

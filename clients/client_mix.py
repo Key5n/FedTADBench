@@ -1,5 +1,6 @@
 from typing import List
 
+from evaluation.metrics import get_metrics
 import numpy as np
 import pandas
 import torch
@@ -675,12 +676,18 @@ def test_inference(model, dataset, score_save_path=""):
         anomaly_scores_all_numpy = np.mean(anomaly_scores_all_numpy, axis=1)
     if len(score_save_path) != 0:
         np.save(score_save_path, anomaly_scores_all_numpy)
-    auc_roc = roc_auc_score(labels_all_numpy, anomaly_scores_all_numpy)
-    ap = average_precision_score(labels_all_numpy, anomaly_scores_all_numpy)
+
+    evaluation_result = get_metrics(anomaly_scores_all_numpy, labels_all_numpy)
+    auc_roc = evaluation_result["AUC-ROC"]
+    ap = evaluation_result["AUC-PR"]
+    vus_roc = evaluation_result["VUS-ROC"]
+    vus_pr = evaluation_result["VUS-PR"]
+    pate = evaluation_result["PATE"]
+    
     if len(loss) != 0:
-        return auc_roc, ap, float(sum(loss) / len(loss)), anomaly_scores_all_numpy
+        return auc_roc, ap, vus_roc, vus_pr, pate, float(sum(loss) / len(loss)), anomaly_scores_all_numpy
     else:
-        return auc_roc, ap, None, anomaly_scores_all_numpy
+        return auc_roc, ap, vus_roc, vus_pr, pate, None, anomaly_scores_all_numpy
 
 
 @torch.no_grad()
